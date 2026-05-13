@@ -1,0 +1,105 @@
+/* ===== Dark Theme (default) ===== */
+:root,
+[data-theme="dark"] {
+  --bg-primary: #212121;
+  --bg-secondary: #171717;
+  --bg-tertiary: #2f2f2f;
+  --bg-input: #3a3a3a;
+  --bg-hover: #2f2f2f;
+  --bg-active: #3a3a3a;
+
+  --border-primary: #2f2f2f;
+  --border-secondary: #4a4a4a;
+  --border-input: #555;
+  --border-focus: #10a37f;
+
+  --text-primary: #ececec;
+  --text-secondary: #aaa;
+  --text-tertiary: #888;
+  --text-muted: #666;
+  --text-hint: #555;
+
+  --accent: #10a37f;
+  --accent-hover: #1a7f64;
+
+  --msg-user: #212121;
+  --msg-assistant: #2f2f2f;
+
+  --el-dialog-bg: #2f2f2f;
+  --el-input-bg: #3a3a3a;
+  --el-input-border: #555;
+  --el-form-label: #ccc;
+}
+
+/* ===== Light Theme ===== */
+:root[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f7f7f8;
+  --bg-tertiary: #ececec;
+  --bg-input: #ffffff;
+  --bg-hover: #f0f0f0;
+  --bg-active: #e8e8e8;
+
+  --border-primary: #e5e5e5;
+  --border-secondary: #d9d9d9;
+  --border-input: #d0d0d0;
+  --border-focus: #10a37f;
+
+  --text-primary: #1a1a1a;
+  --text-secondary: #555;
+  --text-tertiary: #777;
+  --text-muted: #999;
+  --text-hint: #aaa;
+
+  --accent: #10a37f;
+  --accent-hover: #0d8c6d;
+
+  --msg-user: #ffffff;
+  --msg-assistant: #f7f7f8;
+
+  --el-dialog-bg: #ffffff;
+  --el-input-bg: #ffffff;
+  --el-input-border: #d0d0d0;
+  --el-form-label: #333;
+  --el-overlay-bg: rgba(0, 0, 0, 0.3);
+}
+
+/* ===== 全局弹窗 / 输入框样式（不受 scoped 限制） ===== */
+.el-dialog {
+  background: var(--el-dialog-bg) !important;
+  border-radius: 14px !important;
+}
+.el-dialog__title { color: var(--text-primary) !important; }
+.el-dialog__headerbtn .el-dialog__close { color: var(--text-tertiary) !important; }
+.el-dialog__body { color: var(--text-primary); }
+
+.el-form-item__label { color: var(--el-form-label) !important; }
+
+.el-input__wrapper {
+  background: var(--el-input-bg) !important;
+  box-shadow: 0 0 0 1px var(--el-input-border) inset !important;
+}
+.el-input__inner { color: var(--text-primary) !important; }
+.el-input__inner::placeholder { color: var(--text-muted) !important; }
+
+.el-textarea__inner {
+  background: var(--el-input-bg) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 0 0 1px var(--el-input-border) inset !important;
+}
+.el-textarea__inner:focus { border-color: var(--accent) !important; }
+
+.el-upload-dragger {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-secondary) !important;
+}
+.el-upload-dragger:hover { border-color: var(--accent) !important; }
+
+.el-divider { border-color: var(--border-primary) !important; }
+.el-divider__text { color: var(--text-tertiary) !important; }
+
+.el-overlay { background: var(--el-overlay-bg) !important; }
+
+.el-button { color: var(--text-primary); }
+
+.el-avatar { background: var(--bg-tertiary); color: var(--text-secondary); }
