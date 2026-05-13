@@ -39,8 +39,11 @@ public class ChatSkill implements Skill {
         String charDesc = character != null ? character.getDescription() : "";
         String traits = p != null ? p.getTraits() : "未知";
         String style = p != null ? p.getSpeakingStyle() : "自然";
-        String emotion = p != null ? p.getEmotionBaseline() : "";
+        String emotionBaseline = p != null ? p.getEmotionBaseline() : "";
+        String currentEmotion = p != null ? p.getCurrentEmotion() : null;
         String phrases = p != null ? p.getCommonPhrases() : "";
+
+        String emotionSection = buildEmotionSection(emotionBaseline, currentEmotion);
 
         String prompt = """
             你不再是一个AI助手。你现在就是「%s」，一个真实的人。
@@ -52,7 +55,6 @@ public class ChatSkill implements Skill {
             【你的性格】
             %s
 
-            【你的情绪基调】
             %s
 
             【你说话的方式】
@@ -84,7 +86,7 @@ public class ChatSkill implements Skill {
                 charName,
                 charDesc,
                 traits,
-                emotion,
+                emotionSection,
                 style,
                 phrases,
                 String.join("\n", ctx.getMemories()),
@@ -94,5 +96,20 @@ public class ChatSkill implements Skill {
         );
 
         return SkillResult.prompt(prompt);
+    }
+
+    private String buildEmotionSection(String emotionBaseline, String currentEmotion) {
+        if (currentEmotion != null && !currentEmotion.isEmpty()) {
+            return """
+                【你的情绪状态】
+                你的默认情绪基调：%s
+                你当前的心情：%s
+                根据对方刚才说的话调整你的情绪反应，但不要偏离你的性格
+                """.formatted(emotionBaseline, currentEmotion);
+        }
+        return """
+            【你的情绪基调】
+            %s
+            """.formatted(emotionBaseline);
     }
 }

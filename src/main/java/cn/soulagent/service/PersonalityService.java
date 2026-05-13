@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -15,6 +17,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class PersonalityService {
+
+    private static final Logger log = LoggerFactory.getLogger(PersonalityService.class);
 
     private final PersonalityMapper mapper;
     private final AiModelFactory aiModelFactory;
@@ -59,6 +63,7 @@ public class PersonalityService {
             p.setSpeakingStyle(node.get("speaking_style").asText());
             p.setEmotionBaseline(node.get("emotion_baseline").asText());
             p.setCommonPhrases(node.get("common_phrases").asText());
+            p.setCurrentEmotion("");
 
             return p;
 
@@ -67,8 +72,49 @@ public class PersonalityService {
         }
     }
 
+    public String analyzeEmotion(String userMessage, String aiReply, String emotionBaseline,
+                                  String apiKey, String apiUrl, String modelName) {
+
+        String prompt = """
+请根据以下对话，判断角色当前的情绪状态。只输出一个简短的情绪描述（10-20字），不要输出任何其他内容。
+
+角色的情绪基线：%s
+
+用户说：%s
+角色回复：%s
+
+请直接输出情绪描述，例如：
+"平静温和"
+"开心兴奋"
+"关心担忧"
+"有些疲惫但还在坚持"
+"调皮戏谑"
+""".formatted(emotionBaseline, userMessage, aiReply);
+
+        ChatModel model = aiModelFactory.chatModel(apiKey, apiUrl, modelName);
+        String res = model.chat(UserMessage.from(prompt)).aiMessage().text();
+
+        if (res != null && !res.trim().isEmpty()) {
+            return res.trim().replaceAll("^\"|\"$", "").trim();
+        }
+        return "";
+    }
+
+    public void updateEmotion(Long characterId, String emotion) {
+        Personality p = get(characterId);
+        if (p != null) {
+            p.setCurrentEmotion(emotion);
+            mapper.updateById(p);
+            log.debug("更新角色 {} 的情绪: {}", characterId, emotion);
+        }
+    }
+
     public void save(Personality p) {
         mapper.insert(p);
+    }
+
+    public void update(Personality p) {
+        mapper.updateById(p);
     }
 
     public Personality get(Long cid) {

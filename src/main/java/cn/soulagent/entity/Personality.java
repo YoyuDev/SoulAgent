@@ -18,4 +18,5 @@ public class Personality {
     private String speakingStyle;
     private String emotionBaseline;
     private String commonPhrases;
+    private String currentEmotion;
 }

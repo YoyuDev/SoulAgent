@@ -16,6 +16,10 @@
           {{ character.name?.[0] }}
         </el-avatar>
         <span>{{ character.name }}</span>
+        <span v-if="emotion" class="emotion-badge">
+          <span class="emotion-dot"></span>
+          {{ emotion }}
+        </span>
       </div>
 
       <div class="messages" ref="msgContainer" @scroll="onScroll">
@@ -105,7 +109,8 @@ const props = defineProps({
   character: { type: Object, default: null },
   messages: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
-  hasMoreHistory: { type: Boolean, default: false }
+  hasMoreHistory: { type: Boolean, default: false },
+  emotion: { type: String, default: '' }
 })
 const emit = defineEmits(['send', 'loadMore'])
 
@@ -211,6 +216,32 @@ watch(() => props.messages.length, () => {
   flex-shrink: 0;
   color: var(--text-primary);
   transition: border-color 0.3s;
+}
+
+.emotion-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--accent);
+  background: rgba(16, 163, 127, 0.1);
+  padding: 3px 10px;
+  border-radius: 12px;
+  margin-left: 4px;
+}
+
+.emotion-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: emotion-pulse 2s ease-in-out infinite;
+}
+
+@keyframes emotion-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
 }
 
 /* 消息区 */

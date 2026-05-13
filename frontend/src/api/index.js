@@ -119,6 +119,11 @@ export function getChatHistory(characterId, before, size = 20) {
   return http.get(`/chat/history/${characterId}`, { params })
 }
 
+// 获取角色当前情绪
+export function getEmotion(characterId) {
+  return http.get(`/personality/${characterId}`)
+}
+
 // 创建人物（支持文件上传，SSE 进度）
 export function createCharacter(formData, onProgress) {
   return fetch('/api/character/create', {

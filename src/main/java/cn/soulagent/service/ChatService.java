@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
 @Service
@@ -37,6 +38,7 @@ public class ChatService {
     private final ChatMessageMapper chatMessageMapper;
     private final AppSettingMapper appSettingMapper;
     private final SkillRouter skillRouter;
+    private final ExecutorService taskExecutor;
 
     public String chatStream(ChatRequest req, Consumer<String> onToken, Runnable onComplete) {
 
@@ -94,12 +96,13 @@ public class ChatService {
             return reply;
         }
 
-        return callLlm(req, result, onToken, onComplete, apiKey, apiUrl, modelName);
+        return callLlm(req, result, onToken, onComplete, apiKey, apiUrl, modelName, p);
     }
 
     private String callLlm(ChatRequest req, SkillResult result,
                            Consumer<String> onToken, Runnable onComplete,
-                           String apiKey, String apiUrl, String modelName) {
+                           String apiKey, String apiUrl, String modelName,
+                           Personality personality) {
 
         StreamingChatModel streamingModel = aiModelFactory.streamingChatModel(
                 apiKey, apiUrl, modelName
@@ -133,10 +136,32 @@ public class ChatService {
             redisService.append(req.getCharacterId(), req.getMessage(), reply);
             saveMessage(req.getCharacterId(), "user", req.getMessage());
             saveMessage(req.getCharacterId(), "assistant", reply);
+
+            asyncUpdateEmotion(req.getCharacterId(), req.getMessage(), reply, personality,
+                    apiKey, apiUrl, modelName);
+
             return reply;
         } catch (Exception e) {
             throw new RuntimeException("流式聊天失败: " + e.getMessage(), e);
         }
+    }
+
+    private void asyncUpdateEmotion(Long characterId, String userMessage, String aiReply,
+                                     Personality personality,
+                                     String apiKey, String apiUrl, String modelName) {
+        taskExecutor.submit(() -> {
+            try {
+                String emotionBaseline = personality != null ? personality.getEmotionBaseline() : "";
+                String newEmotion = personalityService.analyzeEmotion(
+                        userMessage, aiReply, emotionBaseline, apiKey, apiUrl, modelName);
+                if (newEmotion != null && !newEmotion.isEmpty()) {
+                    personalityService.updateEmotion(characterId, newEmotion);
+                    log.info("角色 {} 情绪更新: {}", characterId, newEmotion);
+                }
+            } catch (Exception e) {
+                log.warn("情绪更新失败: {}", e.getMessage());
+            }
+        });
     }
 
     private String getSetting(String key) {

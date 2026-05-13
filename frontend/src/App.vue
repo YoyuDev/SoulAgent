@@ -18,6 +18,7 @@
       :messages="messages"
       :loading="sending"
       :hasMoreHistory="hasMoreHistory"
+      :emotion="currentEmotion"
       @send="sendMessage"
       @loadMore="loadMoreHistory"
     />
@@ -38,7 +39,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { chat, getCharacters, deleteCharacter as deleteCharacterApi, clearChatHistory, getChatHistory, getSettings, saveSettings } from './api/index.js'
+import { chat, getCharacters, deleteCharacter as deleteCharacterApi, clearChatHistory, getChatHistory, getSettings, saveSettings, getEmotion } from './api/index.js'
 import { useTheme } from './composables/useTheme.js'
 import Sidebar from './components/Sidebar.vue'
 import ChatView from './components/ChatView.vue'
@@ -55,6 +56,7 @@ const hasMoreHistory = ref(false)
 const sidebarCollapsed = ref(false)
 const showCreateDialog = ref(false)
 const showSettingsDialog = ref(false)
+const currentEmotion = ref('')
 
 const settings = ref({
   apiUrl: 'https://api.openai.com/v1',
@@ -96,7 +98,16 @@ async function selectCharacter(id) {
   activeId.value = id
   messages.value = []
   hasMoreHistory.value = false
+  currentEmotion.value = ''
   await loadHistory(id)
+  loadEmotion(id)
+}
+
+async function loadEmotion(characterId) {
+  try {
+    const res = await getEmotion(characterId)
+    currentEmotion.value = res.data?.emotion || ''
+  } catch {}
 }
 
 async function loadHistory(characterId, before) {
@@ -149,6 +160,7 @@ function sendMessage(text) {
     // onDone
     () => {
       sending.value = false
+      loadEmotion(activeId.value)
     },
     // onError
     (errMsg) => {
