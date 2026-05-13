@@ -20,7 +20,7 @@
           <span class="emotion-dot"></span>
           {{ emotion }}
         </span>
-        <span v-if="relationship && relationship.stageDesc && relationship.stageDesc !== '陌生人'" class="relationship-badge">
+        <span v-if="relationship && relationship.stageDesc" class="relationship-badge" :class="{ 'stage-new': relationship.stage === 'stranger' }">
           {{ relationship.stageDesc }}
         </span>
       </div>
@@ -259,6 +259,11 @@ watch(() => props.messages.length, () => {
   padding: 3px 10px;
   border-radius: 12px;
   margin-left: 4px;
+}
+
+.stage-new {
+  color: #9ca3af;
+  background: rgba(156, 163, 175, 0.1);
 }
 
 /* 消息区 */

@@ -203,7 +203,7 @@ public class ChatService {
     private void asyncUpdateRelationship(Long characterId, String userMessage, String aiReply) {
         taskExecutor.submit(() -> {
             try {
-                relationshipService.onChat(characterId, userMessage, aiReply);
+                relationshipService.onChat(characterId, userMessage);
             } catch (Exception e) {
                 log.warn("关系更新失败: {}", e.getMessage());
             }
