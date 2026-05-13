@@ -20,6 +20,9 @@
           <span class="emotion-dot"></span>
           {{ emotion }}
         </span>
+        <span v-if="relationship && relationship.stageDesc && relationship.stageDesc !== '陌生人'" class="relationship-badge">
+          {{ relationship.stageDesc }}
+        </span>
       </div>
 
       <div class="messages" ref="msgContainer" @scroll="onScroll">
@@ -110,7 +113,8 @@ const props = defineProps({
   messages: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
   hasMoreHistory: { type: Boolean, default: false },
-  emotion: { type: String, default: '' }
+  emotion: { type: String, default: '' },
+  relationship: { type: Object, default: null }
 })
 const emit = defineEmits(['send', 'loadMore'])
 
@@ -242,6 +246,19 @@ watch(() => props.messages.length, () => {
 @keyframes emotion-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.relationship-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #a855f7;
+  background: rgba(168, 85, 247, 0.1);
+  padding: 3px 10px;
+  border-radius: 12px;
+  margin-left: 4px;
 }
 
 /* 消息区 */

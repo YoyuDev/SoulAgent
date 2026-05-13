@@ -14,11 +14,16 @@ public class RelationshipService {
 
     private static final Logger log = LoggerFactory.getLogger(RelationshipService.class);
 
-    private static final int STRANGER_THRESHOLD = 0;
-    private static final int ACQUAINTANCE_THRESHOLD = 5;
-    private static final int FRIEND_THRESHOLD = 20;
-    private static final int CLOSE_FRIEND_THRESHOLD = 50;
-    private static final int INTIMATE_THRESHOLD = 100;
+    private static final double MAX_INTIMACY = 1000.0;
+    private static final double MAX_TRUST = 1000.0;
+
+    private static final double ACQUAINTANCE_THRESHOLD = 50;
+    private static final double FRIEND_THRESHOLD = 200;
+    private static final double CLOSE_FRIEND_THRESHOLD = 500;
+    private static final double INTIMATE_THRESHOLD = 800;
+
+    private static final long DECAY_START_HOURS = 24;
+    private static final double DAILY_DECAY_RATE = 0.02;
 
     private final CharacterRelationshipMapper mapper;
 
@@ -35,11 +40,14 @@ public class RelationshipService {
         rel.setTotalMessages(total + 2);
 
         double intimacy = rel.getIntimacyScore() != null ? rel.getIntimacyScore() : 0.0;
-        intimacy = Math.min(100.0, intimacy + calculateIntimacyGain(userMessage, aiReply));
+        double decay = calculateDecay(rel.getLastChatTime(), now);
+        intimacy = Math.max(0.0, intimacy - decay);
+        intimacy = Math.min(MAX_INTIMACY, intimacy + calculateIntimacyGain(userMessage));
         rel.setIntimacyScore(intimacy);
 
         double trust = rel.getTrustScore() != null ? rel.getTrustScore() : 0.0;
-        trust = Math.min(100.0, trust + calculateTrustGain(userMessage, aiReply));
+        trust = Math.max(0.0, trust - decay);
+        trust = Math.min(MAX_TRUST, trust + calculateTrustGain(userMessage));
         rel.setTrustScore(trust);
 
         rel.setRelationshipStage(determineStage(intimacy, trust));
@@ -55,6 +63,7 @@ public class RelationshipService {
 
     public String getStageDescription(Long characterId) {
         CharacterRelationship rel = getOrCreate(characterId);
+        applyDecayIfNeeded(rel);
         return describeStage(rel.getRelationshipStage(), rel.getIntimacyScore());
     }
 
@@ -76,49 +85,68 @@ public class RelationshipService {
         return rel;
     }
 
-    private double calculateIntimacyGain(String userMessage, String aiReply) {
-        double gain = 0.5;
+    private double calculateIntimacyGain(String userMessage) {
+        double gain = 0.1;
 
         int msgLen = userMessage.length();
-        if (msgLen > 20) gain += 0.3;
-        if (msgLen > 50) gain += 0.5;
-        if (msgLen > 100) gain += 1.0;
+        if (msgLen > 50) gain += 0.15;
+        if (msgLen > 100) gain += 0.25;
+        if (msgLen > 200) gain += 0.4;
 
-        String[] emotionalWords = {"开心", "难过", "喜欢", "讨厌", "谢谢", "对不起", "爱你", "想你", "伤心", "高兴", "累", "烦"};
+        String[] emotionalWords = {"爱你", "想你", "喜欢你", "在乎你", "想你", "担心你", "心疼你"};
         for (String word : emotionalWords) {
             if (userMessage.contains(word)) {
-                gain += 0.5;
+                gain += 0.3;
                 break;
             }
-        }
-
-        if (aiReply.length() > 30) {
-            gain += 0.2;
         }
 
         return gain;
     }
 
-    private double calculateTrustGain(String userMessage, String aiReply) {
-        double gain = 0.3;
+    private double calculateTrustGain(String userMessage) {
+        double gain = 0.05;
 
-        String[] trustWords = {"秘密", "信任", "告诉你", "只有你知道", "别告诉别人", "心里话", "坦白", "其实"};
+        String[] trustWords = {"秘密", "别告诉别人", "只有你知道", "心里话", "跟你说实话", "不瞒你说"};
         for (String word : trustWords) {
             if (userMessage.contains(word)) {
-                gain += 2.0;
+                gain += 1.5;
                 break;
             }
         }
 
-        String[] personalWords = {"我家", "我妈妈", "我爸爸", "我对象", "我朋友", "小时候", "以前", "曾经"};
+        String[] personalWords = {"我小时候", "我爸妈", "我对象", "我男朋友", "我女朋友", "我曾经", "我的经历"};
         for (String word : personalWords) {
             if (userMessage.contains(word)) {
-                gain += 1.0;
+                gain += 0.8;
                 break;
             }
         }
 
         return gain;
+    }
+
+    private double calculateDecay(Long lastChatTime, long now) {
+        if (lastChatTime == null || lastChatTime == 0) return 0.0;
+
+        long hoursSinceLastChat = (now - lastChatTime) / (1000 * 60 * 60);
+        if (hoursSinceLastChat < DECAY_START_HOURS) return 0.0;
+
+        double daysInactive = hoursSinceLastChat / 24.0;
+        return daysInactive * DAILY_DECAY_RATE * 100;
+    }
+
+    private void applyDecayIfNeeded(CharacterRelationship rel) {
+        long now = System.currentTimeMillis();
+        double decay = calculateDecay(rel.getLastChatTime(), now);
+        if (decay > 0) {
+            double intimacy = Math.max(0.0, rel.getIntimacyScore() - decay);
+            double trust = Math.max(0.0, rel.getTrustScore() - decay);
+            rel.setIntimacyScore(intimacy);
+            rel.setTrustScore(trust);
+            rel.setRelationshipStage(determineStage(intimacy, trust));
+            mapper.updateById(rel);
+        }
     }
 
     private String determineStage(double intimacy, double trust) {
@@ -132,11 +160,11 @@ public class RelationshipService {
 
     private String describeStage(String stage, Double intimacy) {
         return switch (stage) {
-            case "stranger" -> "陌生人（亲密度：" + String.format("%.0f", intimacy) + "%）";
-            case "acquaintance" -> "认识的人（亲密度：" + String.format("%.0f", intimacy) + "%）";
-            case "friend" -> "朋友（亲密度：" + String.format("%.0f", intimacy) + "%）";
-            case "close_friend" -> "好朋友（亲密度：" + String.format("%.0f", intimacy) + "%）";
-            case "intimate" -> "亲密的人（亲密度：" + String.format("%.0f", intimacy) + "%）";
+            case "stranger" -> "陌生人（亲密度：" + String.format("%.0f", intimacy) + "/1000）";
+            case "acquaintance" -> "认识的人（亲密度：" + String.format("%.0f", intimacy) + "/1000）";
+            case "friend" -> "朋友（亲密度：" + String.format("%.0f", intimacy) + "/1000）";
+            case "close_friend" -> "好朋友（亲密度：" + String.format("%.0f", intimacy) + "/1000）";
+            case "intimate" -> "亲密的人（亲密度：" + String.format("%.0f", intimacy) + "/1000）";
             default -> "陌生人";
         };
     }

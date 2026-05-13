@@ -19,6 +19,7 @@
       :loading="sending"
       :hasMoreHistory="hasMoreHistory"
       :emotion="currentEmotion"
+      :relationship="relationshipData"
       @send="sendMessage"
       @loadMore="loadMoreHistory"
     />
@@ -39,7 +40,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { chat, getCharacters, deleteCharacter as deleteCharacterApi, clearChatHistory, getChatHistory, getSettings, saveSettings, getEmotion } from './api/index.js'
+import { chat, getCharacters, deleteCharacter as deleteCharacterApi, clearChatHistory, getChatHistory, getSettings, saveSettings, getEmotion, getRelationship } from './api/index.js'
 import { useTheme } from './composables/useTheme.js'
 import Sidebar from './components/Sidebar.vue'
 import ChatView from './components/ChatView.vue'
@@ -57,6 +58,7 @@ const sidebarCollapsed = ref(false)
 const showCreateDialog = ref(false)
 const showSettingsDialog = ref(false)
 const currentEmotion = ref('')
+const relationshipData = ref(null)
 
 const settings = ref({
   apiUrl: 'https://api.openai.com/v1',
@@ -99,14 +101,23 @@ async function selectCharacter(id) {
   messages.value = []
   hasMoreHistory.value = false
   currentEmotion.value = ''
+  relationshipData.value = null
   await loadHistory(id)
   loadEmotion(id)
+  loadRelationship(id)
 }
 
 async function loadEmotion(characterId) {
   try {
     const res = await getEmotion(characterId)
     currentEmotion.value = res.data?.emotion || ''
+  } catch {}
+}
+
+async function loadRelationship(characterId) {
+  try {
+    const res = await getRelationship(characterId)
+    relationshipData.value = res.data
   } catch {}
 }
 

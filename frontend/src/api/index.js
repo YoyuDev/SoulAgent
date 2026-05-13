@@ -124,6 +124,11 @@ export function getEmotion(characterId) {
   return http.get(`/personality/${characterId}`)
 }
 
+// 获取角色关系状态
+export function getRelationship(characterId) {
+  return http.get(`/relationship/${characterId}`)
+}
+
 // 创建人物（支持文件上传，SSE 进度）
 export function createCharacter(formData, onProgress) {
   return fetch('/api/character/create', {
