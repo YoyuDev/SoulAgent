@@ -10,15 +10,17 @@ import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingStore;
+import dev.langchain4j.store.embedding.filter.Filter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
 
-/**
- * 基于 Qdrant REST API 的 EmbeddingStore 实现，绕过 langchain4j-qdrant 的 gRPC bug
- */
 public class QdrantRestEmbeddingStore implements EmbeddingStore<TextSegment> {
+
+    private static final Logger log = LoggerFactory.getLogger(QdrantRestEmbeddingStore.class);
 
     private final String baseUrl;
     private final String collectionName;
@@ -81,11 +83,11 @@ public class QdrantRestEmbeddingStore implements EmbeddingStore<TextSegment> {
             }
             point.set("vector", vector);
 
+            ObjectNode payload = mapper.createObjectNode();
             if (segment != null) {
-                ObjectNode payload = mapper.createObjectNode();
                 payload.put("text", segment.text());
-                point.set("payload", payload);
             }
+            point.set("payload", payload);
 
             ArrayNode points = mapper.createArrayNode();
             points.add(point);
@@ -101,10 +103,10 @@ public class QdrantRestEmbeddingStore implements EmbeddingStore<TextSegment> {
             ResponseEntity<String> resp = rest.exchange(url, HttpMethod.PUT, entity, String.class);
 
             if (!resp.getStatusCode().is2xxSuccessful()) {
-                System.err.println("[Qdrant REST] upsert 失败: " + resp.getBody());
+                System.err.println("[Qdrant REST] upsert failed: " + resp.getBody());
             }
         } catch (Exception e) {
-            System.err.println("[Qdrant REST] upsert 异常: " + e.getMessage());
+            System.err.println("[Qdrant REST] upsert exception: " + e.getMessage());
             throw new RuntimeException("Qdrant REST upsert failed", e);
         }
     }
@@ -121,6 +123,21 @@ public class QdrantRestEmbeddingStore implements EmbeddingStore<TextSegment> {
             body.set("vector", vector);
             body.put("limit", request.maxResults());
             body.put("with_payload", true);
+
+            Double minScore = request.minScore();
+            if (minScore != null) {
+                body.put("score_threshold", minScore);
+                log.debug("[Qdrant REST] score_threshold={}", minScore);
+            }
+
+            Filter filter = request.filter();
+            if (filter != null) {
+                ObjectNode filterNode = buildFilterNode(filter);
+                if (filterNode != null) {
+                    body.set("filter", filterNode);
+                    log.debug("[Qdrant REST] filter={}", filterNode);
+                }
+            }
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -145,10 +162,36 @@ public class QdrantRestEmbeddingStore implements EmbeddingStore<TextSegment> {
                 }
             }
 
+            log.debug("[Qdrant REST] search returned {} matches", matches.size());
             return new EmbeddingSearchResult<>(matches);
         } catch (Exception e) {
-            System.err.println("[Qdrant REST] search 异常: " + e.getMessage());
+            System.err.println("[Qdrant REST] search exception: " + e.getMessage());
             throw new RuntimeException("Qdrant REST search failed", e);
         }
+    }
+
+    private ObjectNode buildFilterNode(Filter filter) {
+        if (filter == null) return null;
+
+        String filterStr = filter.toString();
+
+        if (filterStr.contains("characterId")) {
+            int start = filterStr.indexOf("characterId=") + "characterId=".length();
+            int end = filterStr.indexOf(')', start);
+            if (end > start) {
+                String value = filterStr.substring(start, end).trim();
+                ObjectNode filterNode = mapper.createObjectNode();
+                ArrayNode must = mapper.createArrayNode();
+                ObjectNode shouldMatch = mapper.createObjectNode();
+                ObjectNode match = mapper.createObjectNode();
+                match.put("key", "characterId");
+                match.put("value", value);
+                shouldMatch.set("match", match);
+                must.add(shouldMatch);
+                filterNode.set("must", must);
+                return filterNode;
+            }
+        }
+        return null;
     }
 }

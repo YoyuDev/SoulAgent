@@ -72,6 +72,7 @@ public class MemoryService {
                 EmbeddingSearchRequest.builder()
                         .queryEmbedding(queryEmbedding)
                         .maxResults(5)
+                        .minScore(0.6)
                         .filter((Filter) Map.of("characterId", cid))
                         .build()
         );
