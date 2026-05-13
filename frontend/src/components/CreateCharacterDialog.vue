@@ -192,7 +192,7 @@ async function submit() {
       fd.append('avatar', avatarFile.value)
     }
 
-    const res = await createCharacter(fd, props.settings, (data) => {
+    const res = await createCharacter(fd, (data) => {
       progressMessage.value = data.message
       progressPercent.value = data.percent
       if (data.percent <= 25) currentStep.value = 0

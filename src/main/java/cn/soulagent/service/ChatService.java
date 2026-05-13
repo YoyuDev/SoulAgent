@@ -1,14 +1,19 @@
 package cn.soulagent.service;
 
 import cn.soulagent.dto.ChatRequest;
+import cn.soulagent.entity.AppSetting;
 import cn.soulagent.entity.ChatMessage;
 import cn.soulagent.entity.Personality;
 import cn.soulagent.entity.SoulCharacter;
+import cn.soulagent.mapper.AppSettingMapper;
 import cn.soulagent.mapper.ChatMessageMapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,17 +24,24 @@ import java.util.function.Consumer;
 @RequiredArgsConstructor
 public class ChatService {
 
+    private static final Logger log = LoggerFactory.getLogger(ChatService.class);
+
     private final PersonalityService personalityService;
     private final CharacterService characterService;
     private final MemoryService memoryService;
     private final RedisService redisService;
     private final AiModelFactory aiModelFactory;
     private final ChatMessageMapper chatMessageMapper;
+    private final AppSettingMapper appSettingMapper;
 
-    /**
-     * 流式聊天，通过回调逐个发送 token
-     */
     public String chatStream(ChatRequest req, Consumer<String> onToken, Runnable onComplete) {
+
+        String apiKey = getSetting("apiKey");
+        String apiUrl = getSetting("apiUrl");
+        String modelName = getSetting("modelName");
+        String embeddingApiKey = getSetting("embeddingApiKey");
+        String embeddingApiUrl = getSetting("embeddingApiUrl");
+        String embeddingModelName = getSetting("embeddingModelName");
 
         SoulCharacter character = characterService.getById(req.getCharacterId());
         Personality p = personalityService.get(req.getCharacterId());
@@ -40,13 +52,14 @@ public class ChatService {
             memories = memoryService.search(
                     req.getCharacterId(),
                     req.getMessage(),
-                    req.getApiKey(),
-                    req.getApiUrl(),
-                    req.getEmbeddingApiKey(),
-                    req.getEmbeddingApiUrl(),
-                    req.getEmbeddingModelName()
+                    apiKey,
+                    apiUrl,
+                    embeddingApiKey,
+                    embeddingApiUrl,
+                    embeddingModelName
             );
         } catch (Exception e) {
+            log.warn("记忆检索失败: {}", e.getMessage());
             memories = List.of();
         }
 
@@ -109,10 +122,9 @@ public class ChatService {
         );
 
         StreamingChatModel streamingModel = aiModelFactory.streamingChatModel(
-                req.getApiKey(), req.getApiUrl(), req.getModelName()
+                apiKey, apiUrl, modelName
         );
 
-        // 使用流式输出
         CompletableFuture<String> future = new CompletableFuture<>();
         StringBuilder fullReply = new StringBuilder();
         streamingModel.chat(prompt, new StreamingChatResponseHandler() {
@@ -130,6 +142,7 @@ public class ChatService {
 
             @Override
             public void onError(Throwable error) {
+                log.error("流式聊天失败: {}", error.getMessage());
                 onComplete.run();
                 future.completeExceptionally(error);
             }
@@ -144,6 +157,13 @@ public class ChatService {
         } catch (Exception e) {
             throw new RuntimeException("流式聊天失败: " + e.getMessage(), e);
         }
+    }
+
+    private String getSetting(String key) {
+        AppSetting setting = appSettingMapper.selectOne(
+                new QueryWrapper<AppSetting>().eq("setting_key", key)
+        );
+        return setting != null ? setting.getSettingValue() : null;
     }
 
     private void saveMessage(Long characterId, String role, String content) {

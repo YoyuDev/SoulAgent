@@ -21,19 +21,13 @@ export function saveSettings(settings) {
 }
 
 // 聊天（SSE 流式输出）
-export function chat(characterId, message, settings, onToken, onDone, onError) {
+export function chat(characterId, message, onToken, onDone, onError) {
   return fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       characterId,
-      message,
-      apiUrl: settings?.apiUrl || '',
-      apiKey: settings?.apiKey || '',
-      modelName: settings?.modelName || '',
-      embeddingApiUrl: settings?.embeddingApiUrl || '',
-      embeddingApiKey: settings?.embeddingApiKey || '',
-      embeddingModelName: settings?.embeddingModelName || ''
+      message
     })
   }).then(async response => {
     const reader = response.body.getReader()
@@ -126,15 +120,7 @@ export function getChatHistory(characterId, before, size = 20) {
 }
 
 // 创建人物（支持文件上传，SSE 进度）
-export function createCharacter(formData, settings, onProgress) {
-  if (settings?.apiKey) {
-    formData.append('apiKey', settings.apiKey)
-    formData.append('apiUrl', settings.apiUrl || '')
-    formData.append('modelName', settings.modelName || '')
-    formData.append('embeddingApiUrl', settings.embeddingApiUrl || '')
-    formData.append('embeddingApiKey', settings.embeddingApiKey || '')
-    formData.append('embeddingModelName', settings.embeddingModelName || '')
-  }
+export function createCharacter(formData, onProgress) {
   return fetch('/api/character/create', {
     method: 'POST',
     body: formData

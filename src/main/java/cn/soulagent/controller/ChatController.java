@@ -9,6 +9,8 @@ import cn.soulagent.service.ChatService;
 import cn.soulagent.service.RedisService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -16,49 +18,55 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 @RestController
 @RequiredArgsConstructor
 public class ChatController {
 
+    private static final Logger log = LoggerFactory.getLogger(ChatController.class);
+
     private final ChatService chatService;
     private final RedisService redisService;
     private final ChatMessageMapper chatMessageMapper;
     private final AppSettingMapper appSettingMapper;
-    private final ExecutorService executor = Executors.newCachedThreadPool();
+    private final ExecutorService taskExecutor;
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chat(@RequestBody ChatRequest req) {
         SseEmitter emitter = new SseEmitter(120_000L);
 
-        executor.submit(() -> {
+        taskExecutor.submit(() -> {
             try {
                 chatService.chatStream(req,
-                        // onToken: 每收到一个 token 就发送
                         token -> {
                             try {
                                 emitter.send(SseEmitter.event()
                                         .name("token")
                                         .data("{\"content\":\"" + escapeJson(token) + "\"}"));
-                            } catch (Exception ignored) {}
+                            } catch (Exception e) {
+                                log.debug("SSE send token failed: {}", e.getMessage());
+                            }
                         },
-                        // onComplete: 流式输出完成
                         () -> {
                             try {
                                 emitter.send(SseEmitter.event()
                                         .name("done")
                                         .data("{}"));
-                            } catch (Exception ignored) {}
+                            } catch (Exception e) {
+                                log.debug("SSE send done failed: {}", e.getMessage());
+                            }
                         }
                 );
                 emitter.complete();
             } catch (Exception e) {
+                log.error("Chat error: {}", e.getMessage());
                 try {
                     emitter.send(SseEmitter.event()
                             .name("error")
                             .data("{\"message\":\"" + escapeJson(e.getMessage()) + "\"}"));
-                } catch (Exception ignored) {}
+                } catch (Exception ex) {
+                    log.debug("SSE send error failed: {}", ex.getMessage());
+                }
                 emitter.completeWithError(e);
             }
         });
@@ -89,6 +97,8 @@ public class ChatController {
             @RequestParam(required = false) Long before,
             @RequestParam(defaultValue = "20") int size
     ) {
+        int safeSize = Math.min(Math.max(size, 1), 100);
+
         QueryWrapper<ChatMessage> qw = new QueryWrapper<ChatMessage>()
                 .eq("character_id", characterId);
 
@@ -97,14 +107,13 @@ public class ChatController {
         }
 
         qw.orderByDesc("id");
-        qw.last("LIMIT " + (size + 1));
 
-        List<ChatMessage> messages = chatMessageMapper.selectList(qw);
+        List<ChatMessage> allMessages = chatMessageMapper.selectList(qw);
 
-        boolean hasMore = messages.size() > size;
-        if (hasMore) {
-            messages = messages.subList(0, size);
-        }
+        boolean hasMore = allMessages.size() > safeSize;
+        List<ChatMessage> messages = allMessages.size() > safeSize
+                ? allMessages.subList(0, safeSize)
+                : allMessages;
 
         java.util.Collections.reverse(messages);
 

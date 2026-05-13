@@ -142,7 +142,6 @@ function sendMessage(text) {
   chat(
     activeId.value,
     text,
-    settings.value,
     // onToken: 通过索引直接修改，确保 Vue 响应式触发
     (token) => {
       messages.value[idx].content += token
