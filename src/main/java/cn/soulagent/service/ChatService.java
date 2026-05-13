@@ -145,6 +145,8 @@ public class ChatService {
 
             asyncCheckAndSummarize(req.getCharacterId(), apiKey, apiUrl, modelName);
 
+            asyncCheckAndEvolve(req.getCharacterId(), apiKey, apiUrl, modelName);
+
             return reply;
         } catch (Exception e) {
             throw new RuntimeException("流式聊天失败: " + e.getMessage(), e);
@@ -175,6 +177,19 @@ public class ChatService {
                 memoryService.checkAndSummarize(characterId, apiKey, apiUrl, modelName);
             } catch (Exception e) {
                 log.warn("记忆压缩失败: {}", e.getMessage());
+            }
+        });
+    }
+
+    private void asyncCheckAndEvolve(Long characterId, String apiKey, String apiUrl, String modelName) {
+        personalityService.incrementConversationCount(characterId);
+        taskExecutor.submit(() -> {
+            try {
+                if (personalityService.checkAndEvolve(characterId, apiKey, apiUrl, modelName)) {
+                    log.info("角色 {} 人格进化已触发", characterId);
+                }
+            } catch (Exception e) {
+                log.warn("人格进化检查失败: {}", e.getMessage());
             }
         });
     }

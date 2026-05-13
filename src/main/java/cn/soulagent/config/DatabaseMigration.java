@@ -61,5 +61,18 @@ public class DatabaseMigration {
         } catch (Exception e) {
             log.debug("数据库迁移: 索引 idx_summary_character 已存在，跳过");
         }
+
+        try {
+            jdbcTemplate.execute("""
+                ALTER TABLE personality ADD COLUMN conversation_count INTEGER NOT NULL DEFAULT 0
+                """);
+            log.info("数据库迁移: personality.conversation_count 已添加");
+        } catch (Exception e) {
+            if (e.getMessage() != null && e.getMessage().contains("duplicate column")) {
+                log.debug("数据库迁移: personality.conversation_count 已存在，跳过");
+            } else {
+                log.debug("数据库迁移: personality.conversation_count 可能已存在: {}", e.getMessage());
+            }
+        }
     }
 }
