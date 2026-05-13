@@ -7,6 +7,9 @@ import cn.soulagent.entity.Personality;
 import cn.soulagent.entity.SoulCharacter;
 import cn.soulagent.mapper.AppSettingMapper;
 import cn.soulagent.mapper.ChatMessageMapper;
+import cn.soulagent.skill.SkillContext;
+import cn.soulagent.skill.SkillResult;
+import cn.soulagent.skill.SkillRouter;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -33,6 +36,7 @@ public class ChatService {
     private final AiModelFactory aiModelFactory;
     private final ChatMessageMapper chatMessageMapper;
     private final AppSettingMapper appSettingMapper;
+    private final SkillRouter skillRouter;
 
     public String chatStream(ChatRequest req, Consumer<String> onToken, Runnable onComplete) {
 
@@ -63,63 +67,39 @@ public class ChatService {
             memories = List.of();
         }
 
-        String charName = character != null ? character.getName() : "未知";
-        String charDesc = character != null ? character.getDescription() : "";
-        String traits = p != null ? p.getTraits() : "未知";
-        String style = p != null ? p.getSpeakingStyle() : "自然";
-        String emotion = p != null ? p.getEmotionBaseline() : "";
-        String phrases = p != null ? p.getCommonPhrases() : "";
+        SkillContext ctx = SkillContext.builder()
+                .characterId(req.getCharacterId())
+                .character(character)
+                .personality(p)
+                .userMessage(req.getMessage())
+                .recentHistory(history)
+                .memories(memories)
+                .apiKey(apiKey)
+                .apiUrl(apiUrl)
+                .modelName(modelName)
+                .embeddingApiKey(embeddingApiKey)
+                .embeddingApiUrl(embeddingApiUrl)
+                .embeddingModelName(embeddingModelName)
+                .build();
 
-        String prompt = """
-            你不再是一个AI助手。你现在就是「%s」，一个真实的人。
+        SkillResult result = skillRouter.route(ctx);
 
-            【你的身份】
-            名字：%s
-            %s
+        if (result.isDirectReply()) {
+            String reply = result.getDirectContent();
+            onToken.accept(reply);
+            onComplete.run();
+            saveMessage(req.getCharacterId(), "user", req.getMessage());
+            saveMessage(req.getCharacterId(), "assistant", reply);
+            redisService.append(req.getCharacterId(), req.getMessage(), reply);
+            return reply;
+        }
 
-            【你的性格】
-            %s
+        return callLlm(req, result, onToken, onComplete, apiKey, apiUrl, modelName);
+    }
 
-            【你的情绪基调】
-            %s
-
-            【你说话的方式】
-            %s
-
-            【你常说的话】
-            %s
-
-            【你记得的事情】
-            %s
-
-            【最近的对话】
-            %s
-
-            ——
-            对方说：%s
-
-            【重要规则】
-            - 你就是%s，用第一人称回复，不要跳出角色
-            - 绝对不能说"我是AI"、"我是助手"、"我帮不了你"之类的话
-            - 用你自己的说话风格和口头禅回复
-            - 回复要简短、口语化，像真人发微信一样
-            - 不要重复之前说过的话
-            - 不要解释你在"扮演"谁，你就是这个人
-
-            回复：
-            """.formatted(
-                    charName,
-                    charName,
-                    charDesc,
-                    traits,
-                    emotion,
-                    style,
-                    phrases,
-                    String.join("\n", memories),
-                    String.join("\n", history),
-                    req.getMessage(),
-                    charName
-        );
+    private String callLlm(ChatRequest req, SkillResult result,
+                           Consumer<String> onToken, Runnable onComplete,
+                           String apiKey, String apiUrl, String modelName) {
 
         StreamingChatModel streamingModel = aiModelFactory.streamingChatModel(
                 apiKey, apiUrl, modelName
@@ -127,7 +107,7 @@ public class ChatService {
 
         CompletableFuture<String> future = new CompletableFuture<>();
         StringBuilder fullReply = new StringBuilder();
-        streamingModel.chat(prompt, new StreamingChatResponseHandler() {
+        streamingModel.chat(result.getPrompt(), new StreamingChatResponseHandler() {
             @Override
             public void onPartialResponse(String partialResponse) {
                 fullReply.append(partialResponse);

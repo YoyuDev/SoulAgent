@@ -200,6 +200,12 @@ async function submit() {
       else currentStep.value = 2
     })
 
+    if (!res || !res.id) {
+      ElMessage.error('创建失败：服务器未返回角色ID')
+      submitting.value = false
+      return
+    }
+
     const characterName = form.name
     const characterDesc = form.description
     const characterAvatar = avatarPreview.value || ''

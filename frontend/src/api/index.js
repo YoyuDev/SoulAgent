@@ -129,6 +129,28 @@ export function createCharacter(formData, onProgress) {
     const decoder = new TextDecoder()
     let buffer = ''
     let result = null
+    let eventType = ''
+
+    const processLine = (line) => {
+      if (line.startsWith('event:')) {
+        eventType = line.slice(6).trim()
+      } else if (line.startsWith('data:')) {
+        const raw = line.slice(5).trim()
+        if (!raw) return
+        const data = JSON.parse(raw)
+        const type = eventType || ''
+        if (type === 'progress' && onProgress) {
+          onProgress(data)
+        } else if (type === 'done') {
+          result = data
+        } else if (type === 'error') {
+          throw new Error(data.message)
+        }
+        eventType = ''
+      } else if (line.trim() === '') {
+        eventType = ''
+      }
+    }
 
     while (true) {
       const { done, value } = await reader.read()
@@ -138,23 +160,18 @@ export function createCharacter(formData, onProgress) {
       const lines = buffer.split('\n')
       buffer = lines.pop()
 
-      let eventType = ''
       for (const line of lines) {
-        if (line.startsWith('event:')) {
-          eventType = line.slice(6).trim()
-        } else if (line.startsWith('data:') && eventType) {
-          const data = JSON.parse(line.slice(5).trim())
-          if (eventType === 'progress' && onProgress) {
-            onProgress(data)
-          } else if (eventType === 'done') {
-            result = data
-          } else if (eventType === 'error') {
-            throw new Error(data.message)
-          }
-          eventType = ''
-        }
+        processLine(line)
       }
     }
+
+    if (buffer.trim()) {
+      const lines = buffer.split('\n')
+      for (const line of lines) {
+        processLine(line)
+      }
+    }
+
     return result
   })
 }
