@@ -74,5 +74,30 @@ public class DatabaseMigration {
                 log.debug("数据库迁移: personality.conversation_count 可能已存在: {}", e.getMessage());
             }
         }
+
+        try {
+            jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS character_relationship (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    character_id INTEGER NOT NULL UNIQUE,
+                    intimacy_score REAL NOT NULL DEFAULT 0.0,
+                    trust_score REAL NOT NULL DEFAULT 0.0,
+                    first_chat_time INTEGER NOT NULL DEFAULT 0,
+                    last_chat_time INTEGER NOT NULL DEFAULT 0,
+                    total_messages INTEGER NOT NULL DEFAULT 0,
+                    relationship_stage TEXT NOT NULL DEFAULT 'stranger'
+                )
+                """);
+            log.info("数据库迁移: character_relationship 表已创建");
+        } catch (Exception e) {
+            log.debug("数据库迁移: character_relationship 表已存在，跳过");
+        }
+
+        try {
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_relationship_character ON character_relationship(character_id)");
+            log.info("数据库迁移: 索引 idx_relationship_character 已创建");
+        } catch (Exception e) {
+            log.debug("数据库迁移: 索引 idx_relationship_character 已存在，跳过");
+        }
     }
 }

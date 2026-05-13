@@ -45,6 +45,7 @@ public class ChatSkill implements Skill {
 
         String emotionSection = buildEmotionSection(emotionBaseline, currentEmotion);
         String summarySection = buildSummarySection(ctx.getSummary());
+        String relationshipSection = buildRelationshipSection(ctx.getRelationship());
 
         String prompt = """
             你不再是一个AI助手。你现在就是「%s」，一个真实的人。
@@ -56,6 +57,9 @@ public class ChatSkill implements Skill {
             【你的性格】
             %s
 
+            %s
+
+            【你和对方的关系】
             %s
 
             【你说话的方式】
@@ -83,6 +87,7 @@ public class ChatSkill implements Skill {
             - 回复要简短、口语化，像真人发微信一样
             - 不要重复之前说过的话
             - 不要解释你在"扮演"谁，你就是这个人
+            - 你可以根据你们的关系调整说话语气和亲密程度
             - 你可以参考过往对话摘要中的信息来保持对话连贯性
 
             回复：
@@ -92,6 +97,7 @@ public class ChatSkill implements Skill {
                 charDesc,
                 traits,
                 emotionSection,
+                relationshipSection,
                 style,
                 phrases,
                 summarySection,
@@ -124,5 +130,58 @@ public class ChatSkill implements Skill {
             return summary;
         }
         return "（暂无过往对话摘要）";
+    }
+
+    private String buildRelationshipSection(cn.soulagent.entity.CharacterRelationship rel) {
+        if (rel == null) {
+            return "你们刚刚认识，还不熟悉";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        String stage = rel.getRelationshipStage();
+        sb.append("关系阶段：").append(formatStage(stage)).append("\n");
+
+        if (rel.getIntimacyScore() != null) {
+            sb.append("亲密度：").append(String.format("%.0f", rel.getIntimacyScore())).append("\n");
+        }
+        if (rel.getTrustScore() != null) {
+            sb.append("信任度：").append(String.format("%.0f", rel.getTrustScore())).append("\n");
+        }
+        if (rel.getTotalMessages() != null && rel.getTotalMessages() > 0) {
+            sb.append("你们已经聊了 ").append(rel.getTotalMessages()).append(" 轮\n");
+        }
+        if (rel.getFirstChatTime() != null && rel.getFirstChatTime() > 0) {
+            long days = (System.currentTimeMillis() - rel.getFirstChatTime()) / (1000 * 60 * 60 * 24);
+            if (days > 0) {
+                sb.append("你们认识 ").append(days).append(" 天了\n");
+            }
+        }
+
+        sb.append("\n根据你们的关系调整说话语气和亲密程度：\n");
+        sb.append(formatRelationshipHint(stage, rel.getIntimacyScore()));
+
+        return sb.toString();
+    }
+
+    private String formatStage(String stage) {
+        return switch (stage) {
+            case "stranger" -> "陌生人";
+            case "acquaintance" -> "认识的人";
+            case "friend" -> "朋友";
+            case "close_friend" -> "好朋友";
+            case "intimate" -> "亲密的人";
+            default -> "陌生人";
+        };
+    }
+
+    private String formatRelationshipHint(String stage, Double intimacy) {
+        return switch (stage) {
+            case "stranger" -> "你们刚认识，保持礼貌和距离感，不要太热情";
+            case "acquaintance" -> "你们有些了解，可以更自然地聊天，但不要太随意";
+            case "friend" -> "你们是朋友，可以开玩笑，说话更放松，偶尔关心对方";
+            case "close_friend" -> "你们关系很好，可以更随意地开玩笑、吐槽，表达关心";
+            case "intimate" -> "你们关系非常亲密，可以更温柔、更关心对方，偶尔撒娇";
+            default -> "根据你们的关系自然交流";
+        };
     }
 }

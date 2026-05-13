@@ -1,5 +1,6 @@
 package cn.soulagent.skill;
 
+import cn.soulagent.entity.CharacterRelationship;
 import cn.soulagent.entity.Personality;
 import cn.soulagent.entity.SoulCharacter;
 import lombok.Builder;
@@ -14,6 +15,7 @@ public class SkillContext {
     private final Long characterId;
     private final SoulCharacter character;
     private final Personality personality;
+    private final CharacterRelationship relationship;
     private final String userMessage;
     private final List<String> recentHistory;
     private final List<String> memories;

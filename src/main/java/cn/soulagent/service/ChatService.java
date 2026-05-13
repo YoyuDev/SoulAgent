@@ -3,6 +3,7 @@ package cn.soulagent.service;
 import cn.soulagent.dto.ChatRequest;
 import cn.soulagent.entity.AppSetting;
 import cn.soulagent.entity.ChatMessage;
+import cn.soulagent.entity.CharacterRelationship;
 import cn.soulagent.entity.Personality;
 import cn.soulagent.entity.SoulCharacter;
 import cn.soulagent.mapper.AppSettingMapper;
@@ -39,6 +40,7 @@ public class ChatService {
     private final AppSettingMapper appSettingMapper;
     private final SkillRouter skillRouter;
     private final ExecutorService taskExecutor;
+    private final RelationshipService relationshipService;
 
     public String chatStream(ChatRequest req, Consumer<String> onToken, Runnable onComplete) {
 
@@ -51,6 +53,7 @@ public class ChatService {
 
         SoulCharacter character = characterService.getById(req.getCharacterId());
         Personality p = personalityService.get(req.getCharacterId());
+        CharacterRelationship relationship = relationshipService.get(req.getCharacterId());
         List<String> history = redisService.get(req.getCharacterId());
 
         String summary = memoryService.getConversationSummary(req.getCharacterId());
@@ -75,6 +78,7 @@ public class ChatService {
                 .characterId(req.getCharacterId())
                 .character(character)
                 .personality(p)
+                .relationship(relationship)
                 .userMessage(req.getMessage())
                 .recentHistory(history)
                 .memories(memories)
@@ -147,6 +151,8 @@ public class ChatService {
 
             asyncCheckAndEvolve(req.getCharacterId(), apiKey, apiUrl, modelName);
 
+            asyncUpdateRelationship(req.getCharacterId(), req.getMessage(), reply);
+
             return reply;
         } catch (Exception e) {
             throw new RuntimeException("流式聊天失败: " + e.getMessage(), e);
@@ -190,6 +196,16 @@ public class ChatService {
                 }
             } catch (Exception e) {
                 log.warn("人格进化检查失败: {}", e.getMessage());
+            }
+        });
+    }
+
+    private void asyncUpdateRelationship(Long characterId, String userMessage, String aiReply) {
+        taskExecutor.submit(() -> {
+            try {
+                relationshipService.onChat(characterId, userMessage, aiReply);
+            } catch (Exception e) {
+                log.warn("关系更新失败: {}", e.getMessage());
             }
         });
     }
