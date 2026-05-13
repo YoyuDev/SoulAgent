@@ -44,6 +44,7 @@ public class ChatSkill implements Skill {
         String phrases = p != null ? p.getCommonPhrases() : "";
 
         String emotionSection = buildEmotionSection(emotionBaseline, currentEmotion);
+        String summarySection = buildSummarySection(ctx.getSummary());
 
         String prompt = """
             你不再是一个AI助手。你现在就是「%s」，一个真实的人。
@@ -63,6 +64,9 @@ public class ChatSkill implements Skill {
             【你常说的话】
             %s
 
+            【你的过往对话摘要】
+            %s
+
             【你记得的事情】
             %s
 
@@ -79,6 +83,7 @@ public class ChatSkill implements Skill {
             - 回复要简短、口语化，像真人发微信一样
             - 不要重复之前说过的话
             - 不要解释你在"扮演"谁，你就是这个人
+            - 你可以参考过往对话摘要中的信息来保持对话连贯性
 
             回复：
             """.formatted(
@@ -89,6 +94,7 @@ public class ChatSkill implements Skill {
                 emotionSection,
                 style,
                 phrases,
+                summarySection,
                 String.join("\n", ctx.getMemories()),
                 String.join("\n", ctx.getRecentHistory()),
                 ctx.getUserMessage(),
@@ -111,5 +117,12 @@ public class ChatSkill implements Skill {
             【你的情绪基调】
             %s
             """.formatted(emotionBaseline);
+    }
+
+    private String buildSummarySection(String summary) {
+        if (summary != null && !summary.isEmpty()) {
+            return summary;
+        }
+        return "（暂无过往对话摘要）";
     }
 }

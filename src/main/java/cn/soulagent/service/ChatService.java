@@ -53,6 +53,8 @@ public class ChatService {
         Personality p = personalityService.get(req.getCharacterId());
         List<String> history = redisService.get(req.getCharacterId());
 
+        String summary = memoryService.getConversationSummary(req.getCharacterId());
+
         List<String> memories;
         try {
             memories = memoryService.search(
@@ -76,6 +78,7 @@ public class ChatService {
                 .userMessage(req.getMessage())
                 .recentHistory(history)
                 .memories(memories)
+                .summary(summary)
                 .apiKey(apiKey)
                 .apiUrl(apiUrl)
                 .modelName(modelName)
@@ -140,6 +143,8 @@ public class ChatService {
             asyncUpdateEmotion(req.getCharacterId(), req.getMessage(), reply, personality,
                     apiKey, apiUrl, modelName);
 
+            asyncCheckAndSummarize(req.getCharacterId(), apiKey, apiUrl, modelName);
+
             return reply;
         } catch (Exception e) {
             throw new RuntimeException("流式聊天失败: " + e.getMessage(), e);
@@ -160,6 +165,16 @@ public class ChatService {
                 }
             } catch (Exception e) {
                 log.warn("情绪更新失败: {}", e.getMessage());
+            }
+        });
+    }
+
+    private void asyncCheckAndSummarize(Long characterId, String apiKey, String apiUrl, String modelName) {
+        taskExecutor.submit(() -> {
+            try {
+                memoryService.checkAndSummarize(characterId, apiKey, apiUrl, modelName);
+            } catch (Exception e) {
+                log.warn("记忆压缩失败: {}", e.getMessage());
             }
         });
     }

@@ -12,6 +12,10 @@ public class RedisService {
 
     private final StringRedisTemplate redis;
 
+    public StringRedisTemplate getRedisTemplate() {
+        return redis;
+    }
+
     public void append(Long cid, String user, String ai) {
         String key = "chat:" + cid;
         redis.opsForList().rightPush(key, "用户: " + user);

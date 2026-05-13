@@ -17,6 +17,7 @@ public class SkillContext {
     private final String userMessage;
     private final List<String> recentHistory;
     private final List<String> memories;
+    private final String summary;
 
     private final String apiKey;
     private final String apiUrl;
