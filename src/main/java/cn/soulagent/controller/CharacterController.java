@@ -37,12 +37,18 @@ public class CharacterController {
         service.delete(id);
     }
 
+    @PutMapping("/{id}/random-event")
+    public void updateRandomEvent(@PathVariable Long id, @RequestBody RandomEventConfig config) {
+        service.updateRandomEventEnabled(id, config.getEnabled());
+    }
+
     @PostMapping(value = "/create", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter create(
             @RequestParam String name,
             @RequestParam String description,
             @RequestParam String chatData,
-            @RequestParam(required = false) MultipartFile avatar
+            @RequestParam(required = false) MultipartFile avatar,
+            @RequestParam(defaultValue = "0") Integer randomEventEnabled
     ) {
         SseEmitter emitter = new SseEmitter(300_000L);
 
@@ -55,7 +61,7 @@ public class CharacterController {
 
         taskExecutor.submit(() -> {
             try {
-                Long id = service.create(name, description, chatData, avatar,
+                Long id = service.create(name, description, chatData, avatar, randomEventEnabled,
                         apiKey, apiUrl, modelName, embeddingApiKey, embeddingApiUrl, embeddingModelName,
                         (msg, pct) -> {
                             try {

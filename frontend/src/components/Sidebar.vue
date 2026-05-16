@@ -26,10 +26,15 @@
           {{ c.name?.[0] }}
         </el-avatar>
         <span class="char-name">{{ c.name }}</span>
-        <el-dropdown trigger="click" @command="cmd => handleCommand(cmd, c.id)" @click.stop>
+        <el-dropdown trigger="click" @command="cmd => handleCommand(cmd, c)" @click.stop>
           <el-icon class="more-btn"><MoreFilled /></el-icon>
           <template #dropdown>
             <el-dropdown-menu>
+              <el-dropdown-item command="toggleEvent">
+                <span :style="{ color: c.randomEventEnabled ? '#10a37f' : '' }">
+                  {{ c.randomEventEnabled ? '关闭随机事件' : '开启随机事件' }}
+                </span>
+              </el-dropdown-item>
               <el-dropdown-item command="clear">清空聊天记录</el-dropdown-item>
               <el-dropdown-item command="delete" divided>
                 <span style="color: #f56c6c">删除角色</span>
@@ -79,9 +84,9 @@ defineProps({
 })
 import { ElMessageBox } from 'element-plus'
 
-const emit = defineEmits(['select', 'create', 'delete', 'clearHistory', 'settings', 'toggleTheme', 'toggleCollapse'])
+const emit = defineEmits(['select', 'create', 'delete', 'clearHistory', 'settings', 'toggleTheme', 'toggleCollapse', 'updateRandomEvent'])
 
-async function handleCommand(cmd, id) {
+async function handleCommand(cmd, character) {
   if (cmd === 'delete') {
     try {
       await ElMessageBox.confirm('确定删除该人物？删除后不可恢复。', '删除角色', {
@@ -89,7 +94,7 @@ async function handleCommand(cmd, id) {
         cancelButtonText: '取消',
         type: 'warning'
       })
-      emit('delete', id)
+      emit('delete', character.id)
     } catch {}
   } else if (cmd === 'clear') {
     try {
@@ -98,8 +103,10 @@ async function handleCommand(cmd, id) {
         cancelButtonText: '取消',
         type: 'warning'
       })
-      emit('clearHistory', id)
+      emit('clearHistory', character.id)
     } catch {}
+  } else if (cmd === 'toggleEvent') {
+    emit('updateRandomEvent', character.id, !character.randomEventEnabled)
   }
 }
 </script>

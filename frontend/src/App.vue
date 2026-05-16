@@ -12,6 +12,7 @@
       @settings="showSettingsDialog = true"
       @toggleTheme="toggleTheme"
       @toggleCollapse="sidebarCollapsed = !sidebarCollapsed"
+      @update-random-event="handleUpdateRandomEvent"
     />
     <ChatView
       :character="activeCharacter"
@@ -38,9 +39,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { chat, getCharacters, deleteCharacter as deleteCharacterApi, clearChatHistory, getChatHistory, getSettings, saveSettings, getEmotion, getRelationship } from './api/index.js'
+import { ref, computed, onMounted, watch } from 'vue'
+import { ElMessage, ElNotification } from 'element-plus'
+import { chat, getCharacters, deleteCharacter as deleteCharacterApi, clearChatHistory, getChatHistory, getSettings, saveSettings, getEmotion, getRelationship, getUnsharedEvents, markEventAsShared, updateRandomEventEnabled } from './api/index.js'
 import { useTheme } from './composables/useTheme.js'
 import Sidebar from './components/Sidebar.vue'
 import ChatView from './components/ChatView.vue'
@@ -66,8 +67,13 @@ const settings = ref({
   modelName: 'gpt-4o-mini',
   embeddingApiUrl: '',
   embeddingApiKey: '',
-  embeddingModelName: 'text-embedding-3-small'
+  embeddingModelName: 'text-embedding-3-small',
+  randomEventEnabled: true
 })
+
+// 随机事件轮询
+let eventPollingTimer = null
+const POLLING_INTERVAL = 30000 // 30 秒检查一次
 
 onMounted(async () => {
   // 加载设置（从数据库）
@@ -82,6 +88,9 @@ onMounted(async () => {
   getCharacters().then(res => {
     characters.value = res.data || []
   })
+  
+  // 启动随机事件轮询
+  startEventPolling()
 })
 
 function onSettingsSave(val) {
@@ -184,7 +193,10 @@ function sendMessage(text) {
 }
 
 function onCharacterCreated(character) {
-  characters.value.push(character)
+  characters.value.push({
+    ...character,
+    randomEventEnabled: character.randomEventEnabled ? 1 : 0
+  })
   activeId.value = character.id
   messages.value = []
 }
@@ -208,6 +220,71 @@ function clearHistory(id) {
     ElMessage.success('聊天记录已清空')
   })
 }
+
+function handleUpdateRandomEvent(id, enabled) {
+  updateRandomEventEnabled(id, enabled).then(() => {
+    // 更新本地角色列表
+    const char = characters.value.find(c => c.id === id)
+    if (char) {
+      char.randomEventEnabled = enabled ? 1 : 0
+    }
+    ElMessage.success(enabled ? '已开启随机事件' : '已关闭随机事件')
+  }).catch(() => {
+    ElMessage.error('更新失败')
+  })
+}
+
+// 随机事件轮询
+function startEventPolling() {
+  if (eventPollingTimer) {
+    clearInterval(eventPollingTimer)
+  }
+  
+  eventPollingTimer = setInterval(async () => {
+    if (!activeId.value || !settings.value.randomEventEnabled) {
+      return
+    }
+    
+    try {
+      const res = await getUnsharedEvents(activeId.value)
+      const events = res.data?.events || []
+      
+      if (events.length > 0) {
+        // 显示最新的事件通知
+        const latestEvent = events[0]
+        const shouldShare = latestEvent.eventContent?.includes('[想分享给你]')
+        
+        if (shouldShare) {
+          const content = latestEvent.eventContent.replace('[想分享给你]', '')
+          
+          ElNotification({
+            title: `${activeCharacter.value?.name} 想分享给你`,
+            message: content,
+            type: 'info',
+            duration: 8000,
+            position: 'bottom-right',
+            onClick: () => {
+              // 点击通知时标记为已分享
+              markEventAsShared(latestEvent.id).catch(() => {})
+            }
+          })
+          
+          // 自动标记为已分享
+          markEventAsShared(latestEvent.id).catch(() => {})
+        }
+      }
+    } catch (e) {
+      console.error('检查随机事件失败:', e)
+    }
+  }, POLLING_INTERVAL)
+}
+
+// 监听角色切换，重新开始轮询
+watch(activeId, () => {
+  if (activeId.value) {
+    startEventPolling()
+  }
+})
 </script>
 
 <style>

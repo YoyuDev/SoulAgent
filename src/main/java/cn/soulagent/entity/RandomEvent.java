@@ -6,15 +6,21 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 @Data
-@TableName("character")
-public class SoulCharacter {
+@TableName("random_event")
+public class RandomEvent {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private String name;
-    private String description;
-    private String avatar;
-    private Integer randomEventEnabled;
-    private Long lastEventTime;
+    private Long characterId;
+
+    private String eventType;
+
+    private String eventContent;
+
+    private Long eventTime;
+
+    private Integer isShared;
+
+    private Long shareTime;
 }

@@ -129,6 +129,26 @@ export function getRelationship(characterId) {
   return http.get(`/relationship/${characterId}`)
 }
 
+// 获取未分享的随机事件
+export function getUnsharedEvents(characterId) {
+  return http.get(`/random-event/character/${characterId}/unshared`)
+}
+
+// 获取最近的随机事件
+export function getRecentEvents(characterId, limit = 10) {
+  return http.get(`/random-event/character/${characterId}/recent?limit=${limit}`)
+}
+
+// 标记随机事件为已分享
+export function markEventAsShared(eventId) {
+  return http.post(`/random-event/${eventId}/share`)
+}
+
+// 更新随机事件开关
+export function updateRandomEventEnabled(characterId, enabled) {
+  return http.put(`/character/${characterId}/random-event`, { enabled: enabled ? 1 : 0 })
+}
+
 // 创建人物（支持文件上传，SSE 进度）
 export function createCharacter(formData, onProgress) {
   return fetch('/api/character/create', {

@@ -69,6 +69,15 @@
         </el-upload>
       </el-form-item>
 
+      <el-form-item label="随机事件">
+        <el-switch
+          v-model="form.randomEventEnabled"
+          active-text="开启"
+          inactive-text="关闭"
+        />
+        <div class="field-hint">开启后，该角色会不定期产生随机事件并分享给你</div>
+      </el-form-item>
+
       <el-form-item prop="chatFile">
         <template #label>
           <span>聊天记录</span>
@@ -124,7 +133,8 @@ const chatFile = ref(null)
 
 const form = reactive({
   name: '',
-  description: ''
+  description: '',
+  randomEventEnabled: false
 })
 
 const rules = {
@@ -187,6 +197,7 @@ async function submit() {
     const fd = new FormData()
     fd.append('name', form.name)
     fd.append('description', form.description)
+    fd.append('randomEventEnabled', form.randomEventEnabled ? '1' : '0')
     fd.append('chatData', parsed.join('\n'))
     if (avatarFile.value) {
       fd.append('avatar', avatarFile.value)
@@ -209,10 +220,12 @@ async function submit() {
     const characterName = form.name
     const characterDesc = form.description
     const characterAvatar = avatarPreview.value || ''
+    const characterRandomEventEnabled = form.randomEventEnabled
 
     // 重置表单
     form.name = ''
     form.description = ''
+    form.randomEventEnabled = false
     avatarPreview.value = ''
     avatarFile.value = null
     chatFile.value = null
@@ -225,7 +238,8 @@ async function submit() {
       id: res.id,
       name: characterName,
       description: characterDesc,
-      avatar: characterAvatar
+      avatar: characterAvatar,
+      randomEventEnabled: characterRandomEventEnabled
     })
 
     ElMessage.success('人物创建成功')
@@ -394,5 +408,11 @@ async function submit() {
   color: var(--text-muted);
   margin-left: 8px;
   font-weight: normal;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
 }
 </style>

@@ -30,6 +30,7 @@ public class CharacterService {
     private MemoryService memoryService;
 
     public Long create(String name, String description, String chatData, MultipartFile avatar,
+                        Integer randomEventEnabled,
                         String apiKey, String apiUrl, String modelName,
                         String embeddingApiKey, String embeddingApiUrl, String embeddingModelName,
                         BiConsumer<String, Integer> progress) {
@@ -39,6 +40,7 @@ public class CharacterService {
         SoulCharacter c = new SoulCharacter();
         c.setName(name);
         c.setDescription(description);
+        c.setRandomEventEnabled(randomEventEnabled != null ? randomEventEnabled : 0);
 
         // 处理头像
         if (avatar != null && !avatar.isEmpty()) {
@@ -88,6 +90,14 @@ public class CharacterService {
     public void delete(Long id) {
         characterMapper.deleteById(id);
         personalityMapper.delete(new QueryWrapper<cn.soulagent.entity.Personality>().eq("character_id", id));
+    }
+
+    public void updateRandomEventEnabled(Long id, Integer enabled) {
+        SoulCharacter character = characterMapper.selectById(id);
+        if (character != null) {
+            character.setRandomEventEnabled(enabled);
+            characterMapper.updateById(character);
+        }
     }
 
     private List<String> parseChat(String raw) {
