@@ -1,3 +1,5 @@
+
+
 <p align="center">
   <img src="frontend/public/logo.png" width="100" alt="SoulAgent Logo" style="border-radius: 22px;" />
 </p>
@@ -264,7 +266,8 @@ python tools/export_wechat.py --db D:\wx_dump\de_MSG0.db --out E:\微信聊天�
 ```
 
 ---
-## 微信聊天记录导出
+
+## QQ 聊天记录导出
 
 > **⚠️ 注意：本项目技术仅用于学习和技术交流，请勿用于非法用途！**
 ## 技术架构
