@@ -95,18 +95,41 @@
             @keydown.enter.exact.prevent="send"
             ref="textarea"
           ></textarea>
+          <button
+            class="mic-btn"
+            :class="{ recording: recognizing }"
+            :disabled="loading"
+            :title="recognizing ? '停止语音输入' : '语音输入'"
+            @click="toggleVoice"
+          >
+            <el-icon :size="18"><Microphone /></el-icon>
+          </button>
           <button class="send-btn" :disabled="!input.trim() || loading" @click="send">
             <el-icon :size="18"><Promotion /></el-icon>
           </button>
         </div>
-        <div class="input-hint">按 Enter 发送</div>
+        <div class="input-hint">
+          <template v-if="recognizing">
+            <span class="voice-wave" aria-hidden="true">
+              <span
+                v-for="n in 5"
+                :key="n"
+                class="voice-bar"
+                :style="{ animationDelay: `${(n - 1) * 0.12}s` }"
+              ></span>
+            </span>
+            <span>正在聆听... 点击麦克风停止</span>
+          </template>
+          <span v-else>按 Enter 发送</span>
+        </div>
       </div>
     </template>
   </div>
 </template>
 
 <script setup>
-import { ref, nextTick, watch } from 'vue'
+import { ref, nextTick, watch, onBeforeUnmount } from 'vue'
+import { ElMessage } from 'element-plus'
 
 const props = defineProps({
   character: { type: Object, default: null },
@@ -114,7 +137,8 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
   hasMoreHistory: { type: Boolean, default: false },
   emotion: { type: String, default: '' },
-  relationship: { type: Object, default: null }
+  relationship: { type: Object, default: null },
+  voiceLanguage: { type: String, default: 'zh-CN' }
 })
 const emit = defineEmits(['send', 'loadMore'])
 
@@ -124,9 +148,117 @@ const textarea = ref(null)
 const loadingMore = ref(false)
 let skipNextScroll = false
 
+// 语音输入
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+const recognizing = ref(false)
+let recognition = null
+let baseText = ''
+let finalText = ''
+
+// 保留已确认文本，丢弃临时结果
+function finalizeInput() {
+  input.value = baseText + finalText
+}
+
+// 强制销毁当前识别实例，确保麦克风真正停止
+function destroyRecognition() {
+  if (!recognition) return
+  const rec = recognition
+  recognition = null
+  rec.onstart = rec.onresult = rec.onerror = rec.onend = null
+  try {
+    rec.abort()
+  } catch (e) { /* ignore */ }
+}
+
+function stopVoice() {
+  recognizing.value = false
+  finalizeInput()
+  destroyRecognition()
+}
+
+function toggleVoice() {
+  if (!SpeechRecognition) {
+    ElMessage.warning('当前浏览器不支持语音输入，请使用 Chrome 或 Edge')
+    return
+  }
+
+  if (recognizing.value) {
+    stopVoice()
+    return
+  }
+
+  // 清理可能残留的旧实例
+  destroyRecognition()
+
+  baseText = input.value
+  finalText = ''
+
+  const rec = new SpeechRecognition()
+  rec.lang = props.voiceLanguage || 'zh-CN'
+  rec.continuous = true
+  rec.interimResults = true
+
+  rec.onresult = (event) => {
+    if (recognition !== rec) return
+    let interim = ''
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const transcript = event.results[i][0].transcript
+      if (event.results[i].isFinal) {
+        finalText += transcript
+      } else {
+        interim += transcript
+      }
+    }
+    input.value = baseText + finalText + interim
+  }
+
+  rec.onerror = (event) => {
+    if (recognition !== rec) return
+    recognizing.value = false
+    const err = event.error
+    console.warn('[语音输入] 识别错误:', err)
+    if (err === 'not-allowed' || err === 'service-not-allowed') {
+      ElMessage.error('麦克风权限被拒绝，请在浏览器中允许访问麦克风')
+    } else if (err === 'audio-capture') {
+      ElMessage.error('未检测到麦克风设备')
+    } else if (err === 'no-speech') {
+      ElMessage.warning('未检测到语音，请重试')
+    } else if (err === 'network') {
+      ElMessage.error('无法连接语音识别服务，请检查网络（浏览器语音识别依赖 Google 服务，国内网络下不可用）')
+    } else if (err === 'language-not-supported') {
+      ElMessage.error('当前语音输入语言不被识别服务支持，请在设置中更换')
+    } else if (err !== 'aborted') {
+      ElMessage.error('语音识别出错：' + err)
+    }
+  }
+
+  rec.onend = () => {
+    if (recognition !== rec) return
+    recognition = null
+    recognizing.value = false
+    finalizeInput()
+  }
+
+  recognition = rec
+  recognizing.value = true
+  try {
+    rec.start()
+  } catch (e) {
+    recognition = null
+    recognizing.value = false
+    ElMessage.error('语音识别启动失败，请重试')
+  }
+}
+
+onBeforeUnmount(() => {
+  destroyRecognition()
+})
+
 function send() {
   const text = input.value.trim()
   if (!text || props.loading) return
+  if (recognizing.value) stopVoice()
   emit('send', text)
   input.value = ''
 }
@@ -436,6 +568,33 @@ watch(() => props.messages.length, () => {
 }
 .input-box textarea::placeholder { color: var(--text-muted); }
 
+.mic-btn {
+  width: 34px; height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+  margin-right: 6px;
+}
+.mic-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--accent); }
+.mic-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.mic-btn.recording {
+  color: #fff;
+  background: #ef4444;
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+.mic-btn.recording:hover { background: #dc2626; color: #fff; }
+
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+
 .send-btn {
   width: 34px; height: 34px;
   border: none;
@@ -451,9 +610,35 @@ watch(() => props.messages.length, () => {
 .send-btn:disabled { background: var(--text-muted); cursor: not-allowed; }
 
 .input-hint {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   font-size: 12px;
   color: var(--text-hint);
   margin-top: 6px;
+  min-height: 18px;
+}
+
+/* 语音输入条状律动 */
+.voice-wave {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 16px;
+}
+
+.voice-bar {
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transform-origin: center;
+  animation: voice-wave 0.9s ease-in-out infinite;
+}
+
+@keyframes voice-wave {
+  0%, 100% { transform: scaleY(0.25); opacity: 0.5; }
+  50% { transform: scaleY(1); opacity: 1; }
 }
 </style>

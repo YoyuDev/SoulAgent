@@ -56,6 +56,20 @@
         />
         <div class="field-hint">用于聊天记录向量化存储和记忆检索</div>
       </el-form-item>
+
+      <el-divider content-position="left">语音输入</el-divider>
+
+      <el-form-item label="语音输入语言">
+        <el-select v-model="form.voiceLanguage" placeholder="选择语音识别语言" style="width: 100%">
+          <el-option
+            v-for="opt in languageOptions"
+            :key="opt.value"
+            :label="opt.label"
+            :value="opt.value"
+          />
+        </el-select>
+        <div class="field-hint">使用麦克风语音输入时识别的语言</div>
+      </el-form-item>
     </el-form>
 
     <template #footer>
@@ -81,8 +95,22 @@ const defaults = {
   modelName: 'gpt-4o-mini',
   embeddingApiUrl: '',
   embeddingApiKey: '',
-  embeddingModelName: 'BAAI/bge-m3'
+  embeddingModelName: 'BAAI/bge-m3',
+  voiceLanguage: 'zh-CN'
 }
+
+const languageOptions = [
+  { label: '中文（简体）', value: 'zh-CN' },
+  { label: '中文（繁體）', value: 'zh-TW' },
+  { label: 'English (US)', value: 'en-US' },
+  { label: 'English (UK)', value: 'en-GB' },
+  { label: '日本語', value: 'ja-JP' },
+  { label: '한국어', value: 'ko-KR' },
+  { label: 'Français', value: 'fr-FR' },
+  { label: 'Deutsch', value: 'de-DE' },
+  { label: 'Español', value: 'es-ES' },
+  { label: 'Русский', value: 'ru-RU' }
+]
 
 const form = reactive({ ...defaults })
 
@@ -94,6 +122,7 @@ watch(() => props.modelValue, (val) => {
     form.embeddingApiUrl = props.settings.embeddingApiUrl || defaults.embeddingApiUrl
     form.embeddingApiKey = props.settings.embeddingApiKey || defaults.embeddingApiKey
     form.embeddingModelName = props.settings.embeddingModelName || defaults.embeddingModelName
+    form.voiceLanguage = props.settings.voiceLanguage || defaults.voiceLanguage
   }
 })
 

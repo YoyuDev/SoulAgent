@@ -21,6 +21,7 @@
       :hasMoreHistory="hasMoreHistory"
       :emotion="currentEmotion"
       :relationship="relationshipData"
+      :voiceLanguage="settings.voiceLanguage"
       @send="sendMessage"
       @loadMore="loadMoreHistory"
     />
@@ -68,7 +69,8 @@ const settings = ref({
   embeddingApiUrl: '',
   embeddingApiKey: '',
   embeddingModelName: 'text-embedding-3-small',
-  randomEventEnabled: true
+  randomEventEnabled: true,
+  voiceLanguage: 'zh-CN'
 })
 
 // 随机事件轮询
