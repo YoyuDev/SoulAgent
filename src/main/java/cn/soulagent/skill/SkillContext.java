@@ -2,6 +2,7 @@ package cn.soulagent.skill;
 
 import cn.soulagent.entity.CharacterRelationship;
 import cn.soulagent.entity.Personality;
+import cn.soulagent.entity.RandomEvent;
 import cn.soulagent.entity.SoulCharacter;
 import lombok.Builder;
 import lombok.Getter;
@@ -20,6 +21,7 @@ public class SkillContext {
     private final List<String> recentHistory;
     private final List<String> memories;
     private final String summary;
+    private final List<RandomEvent> recentEvents;
 
     private final String apiKey;
     private final String apiUrl;

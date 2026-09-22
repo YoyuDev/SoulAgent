@@ -13,6 +13,8 @@
       @toggleTheme="toggleTheme"
       @toggleCollapse="sidebarCollapsed = !sidebarCollapsed"
       @update-random-event="handleUpdateRandomEvent"
+      @viewInfo="openCharacterInfo"
+      @viewEvents="openCharacterEvents"
     />
     <ChatView
       :character="activeCharacter"
@@ -24,6 +26,7 @@
       :voiceLanguage="settings.voiceLanguage"
       @send="sendMessage"
       @loadMore="loadMoreHistory"
+      @viewInfo="openActiveCharacterInfo"
     />
     <CreateCharacterDialog
       v-model="showCreateDialog"
@@ -35,6 +38,15 @@
       v-model="showSettingsDialog"
       :settings="settings"
       @save="onSettingsSave"
+    />
+    <CharacterInfoDialog
+      v-model="showInfoDialog"
+      :character="infoCharacter"
+      @viewEvents="openCharacterEvents(infoCharacter)"
+    />
+    <EventHistoryDialog
+      v-model="showEventsDialog"
+      :character="eventsCharacter"
     />
   </div>
 </template>
@@ -48,6 +60,8 @@ import Sidebar from './components/Sidebar.vue'
 import ChatView from './components/ChatView.vue'
 import CreateCharacterDialog from './components/CreateCharacterDialog.vue'
 import SettingsDialog from './components/SettingsDialog.vue'
+import CharacterInfoDialog from './components/CharacterInfoDialog.vue'
+import EventHistoryDialog from './components/EventHistoryDialog.vue'
 
 const { theme, toggle: toggleTheme } = useTheme()
 
@@ -59,6 +73,10 @@ const hasMoreHistory = ref(false)
 const sidebarCollapsed = ref(false)
 const showCreateDialog = ref(false)
 const showSettingsDialog = ref(false)
+const showInfoDialog = ref(false)
+const infoCharacter = ref(null)
+const showEventsDialog = ref(false)
+const eventsCharacter = ref(null)
 const currentEmotion = ref('')
 const relationshipData = ref(null)
 
@@ -96,11 +114,28 @@ onMounted(async () => {
 })
 
 function onSettingsSave(val) {
-  settings.value = val
+  // 合并而非整体替换，避免丢失表单之外的配置（如 randomEventEnabled）
+  settings.value = { ...settings.value, ...val }
   // 保存到数据库
   saveSettings(val).catch(() => {
     ElMessage.warning('设置保存失败')
   })
+}
+
+function openCharacterInfo(character) {
+  if (!character) return
+  infoCharacter.value = character
+  showInfoDialog.value = true
+}
+
+function openActiveCharacterInfo() {
+  openCharacterInfo(activeCharacter.value)
+}
+
+function openCharacterEvents(character) {
+  if (!character) return
+  eventsCharacter.value = character
+  showEventsDialog.value = true
 }
 
 const activeCharacter = computed(() =>
@@ -243,37 +278,37 @@ function startEventPolling() {
   }
   
   eventPollingTimer = setInterval(async () => {
-    if (!activeId.value || !settings.value.randomEventEnabled) {
+    // 仅在明确关闭时才跳过，避免配置缺失导致轮询失效
+    if (!activeId.value || settings.value.randomEventEnabled === false) {
       return
     }
-    
+
     try {
       const res = await getUnsharedEvents(activeId.value)
       const events = res.data?.events || []
-      
-      if (events.length > 0) {
-        // 显示最新的事件通知
-        const latestEvent = events[0]
-        const shouldShare = latestEvent.eventContent?.includes('[想分享给你]')
-        
-        if (shouldShare) {
-          const content = latestEvent.eventContent.replace('[想分享给你]', '')
-          
-          ElNotification({
-            title: `${activeCharacter.value?.name} 想分享给你`,
-            message: content,
-            type: 'info',
-            duration: 8000,
-            position: 'bottom-right',
-            onClick: () => {
-              // 点击通知时标记为已分享
-              markEventAsShared(latestEvent.id).catch(() => {})
-            }
-          })
-          
-          // 自动标记为已分享
-          markEventAsShared(latestEvent.id).catch(() => {})
-        }
+
+      // 处理所有可分享事件（倒序变正序），避免较早的事件被最新一条挡住
+      const shareable = events
+        .filter(e => e.eventContent?.includes('[想分享给你]'))
+        .reverse()
+
+      for (const event of shareable) {
+        const content = event.eventContent.replace('[想分享给你]', '').trim()
+
+        ElNotification({
+          title: `${activeCharacter.value?.name} 想分享给你`,
+          message: content,
+          type: 'info',
+          duration: 8000,
+          position: 'bottom-right',
+          onClick: () => {
+            // 点击通知时标记为已分享
+            markEventAsShared(event.id).catch(() => {})
+          }
+        })
+
+        // 自动标记为已分享
+        markEventAsShared(event.id).catch(() => {})
       }
     } catch (e) {
       console.error('检查随机事件失败:', e)

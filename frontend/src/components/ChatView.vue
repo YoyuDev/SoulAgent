@@ -12,10 +12,12 @@
     <!-- 聊天区 -->
     <template v-else>
       <div class="chat-header">
-        <el-avatar :size="30" :src="character.avatar || undefined">
-          {{ character.name?.[0] }}
-        </el-avatar>
-        <span>{{ character.name }}</span>
+        <div class="header-profile" title="查看角色资料" @click="$emit('viewInfo')">
+          <el-avatar :size="30" :src="character.avatar || undefined">
+            {{ character.name?.[0] }}
+          </el-avatar>
+          <span>{{ character.name }}</span>
+        </div>
         <span v-if="emotion" class="emotion-badge">
           <span class="emotion-dot"></span>
           {{ emotion }}
@@ -140,7 +142,7 @@ const props = defineProps({
   relationship: { type: Object, default: null },
   voiceLanguage: { type: String, default: 'zh-CN' }
 })
-const emit = defineEmits(['send', 'loadMore'])
+const emit = defineEmits(['send', 'loadMore', 'viewInfo'])
 
 const input = ref('')
 const msgContainer = ref(null)
@@ -353,6 +355,18 @@ watch(() => props.messages.length, () => {
   color: var(--text-primary);
   transition: border-color 0.3s;
 }
+
+.header-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  margin-left: -8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.header-profile:hover { background: var(--bg-hover); }
 
 .emotion-badge {
   display: inline-flex;

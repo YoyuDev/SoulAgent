@@ -30,6 +30,8 @@
           <el-icon class="more-btn"><MoreFilled /></el-icon>
           <template #dropdown>
             <el-dropdown-menu>
+              <el-dropdown-item command="info">查看资料</el-dropdown-item>
+              <el-dropdown-item command="events">事件记录</el-dropdown-item>
               <el-dropdown-item command="toggleEvent">
                 <span :style="{ color: c.randomEventEnabled ? '#10a37f' : '' }">
                   {{ c.randomEventEnabled ? '关闭随机事件' : '开启随机事件' }}
@@ -84,10 +86,14 @@ defineProps({
 })
 import { ElMessageBox } from 'element-plus'
 
-const emit = defineEmits(['select', 'create', 'delete', 'clearHistory', 'settings', 'toggleTheme', 'toggleCollapse', 'updateRandomEvent'])
+const emit = defineEmits(['select', 'create', 'delete', 'clearHistory', 'settings', 'toggleTheme', 'toggleCollapse', 'updateRandomEvent', 'viewInfo', 'viewEvents'])
 
 async function handleCommand(cmd, character) {
-  if (cmd === 'delete') {
+  if (cmd === 'info') {
+    emit('viewInfo', character)
+  } else if (cmd === 'events') {
+    emit('viewEvents', character)
+  } else if (cmd === 'delete') {
     try {
       await ElMessageBox.confirm('确定删除该人物？删除后不可恢复。', '删除角色', {
         confirmButtonText: '删除',

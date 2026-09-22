@@ -5,6 +5,7 @@ import cn.soulagent.entity.AppSetting;
 import cn.soulagent.entity.ChatMessage;
 import cn.soulagent.entity.CharacterRelationship;
 import cn.soulagent.entity.Personality;
+import cn.soulagent.entity.RandomEvent;
 import cn.soulagent.entity.SoulCharacter;
 import cn.soulagent.mapper.AppSettingMapper;
 import cn.soulagent.mapper.ChatMessageMapper;
@@ -41,6 +42,7 @@ public class ChatService {
     private final SkillRouter skillRouter;
     private final ExecutorService taskExecutor;
     private final RelationshipService relationshipService;
+    private final RandomEventService randomEventService;
 
     public String chatStream(ChatRequest req, Consumer<String> onToken, Runnable onComplete) {
 
@@ -74,6 +76,14 @@ public class ChatService {
             memories = List.of();
         }
 
+        List<RandomEvent> recentEvents;
+        try {
+            recentEvents = randomEventService.getRecentEvents(req.getCharacterId(), 3);
+        } catch (Exception e) {
+            log.warn("读取随机事件失败: {}", e.getMessage());
+            recentEvents = List.of();
+        }
+
         SkillContext ctx = SkillContext.builder()
                 .characterId(req.getCharacterId())
                 .character(character)
@@ -83,6 +93,7 @@ public class ChatService {
                 .recentHistory(history)
                 .memories(memories)
                 .summary(summary)
+                .recentEvents(recentEvents)
                 .apiKey(apiKey)
                 .apiUrl(apiUrl)
                 .modelName(modelName)

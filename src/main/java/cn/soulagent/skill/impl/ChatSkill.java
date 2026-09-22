@@ -1,11 +1,17 @@
 package cn.soulagent.skill.impl;
 
 import cn.soulagent.entity.Personality;
+import cn.soulagent.entity.RandomEvent;
 import cn.soulagent.entity.SoulCharacter;
 import cn.soulagent.skill.Skill;
 import cn.soulagent.skill.SkillContext;
 import cn.soulagent.skill.SkillResult;
 import org.springframework.stereotype.Component;
+
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Component
 public class ChatSkill implements Skill {
@@ -46,6 +52,7 @@ public class ChatSkill implements Skill {
         String emotionSection = buildEmotionSection(emotionBaseline, currentEmotion);
         String summarySection = buildSummarySection(ctx.getSummary());
         String relationshipSection = buildRelationshipSection(ctx.getRelationship());
+        String eventSection = buildEventSection(ctx.getRecentEvents());
 
         String prompt = """
             【重要身份认知】
@@ -78,6 +85,10 @@ public class ChatSkill implements Skill {
             【你记得的事情】
             %s
 
+            【你最近经历的事】
+            %s
+            上面是你自己生活里刚发生的事，如果话题相关可以自然地提起（用第一人称），不要生硬罗列。
+
             【最近的对话】
             %s
 
@@ -108,6 +119,7 @@ public class ChatSkill implements Skill {
                 phrases,
                 summarySection,
                 String.join("\n", ctx.getMemories()),
+                eventSection,
                 String.join("\n", ctx.getRecentHistory()),
                 ctx.getUserMessage(),
                 charName
@@ -136,6 +148,37 @@ public class ChatSkill implements Skill {
             return summary;
         }
         return "（暂无过往对话摘要）";
+    }
+
+    private String buildEventSection(List<RandomEvent> events) {
+        if (events == null || events.isEmpty()) {
+            return "（最近没有什么特别的事）";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (RandomEvent e : events) {
+            String content = cleanEventContent(e.getEventContent());
+            if (content.isEmpty()) {
+                continue;
+            }
+            sb.append("- ").append(formatEventTime(e.getEventTime())).append(" ").append(content).append("\n");
+        }
+        return sb.length() > 0 ? sb.toString().trim() : "（最近没有什么特别的事）";
+    }
+
+    private String cleanEventContent(String content) {
+        if (content == null) {
+            return "";
+        }
+        return content.replace("[想分享给你]", "").replace("[暂时不想分享]", "").trim();
+    }
+
+    private String formatEventTime(Long eventTime) {
+        if (eventTime == null || eventTime == 0) {
+            return "";
+        }
+        return Instant.ofEpochMilli(eventTime)
+                .atZone(ZoneId.systemDefault())
+                .format(DateTimeFormatter.ofPattern("MM-dd HH:mm"));
     }
 
     private String buildRelationshipSection(cn.soulagent.entity.CharacterRelationship rel) {
