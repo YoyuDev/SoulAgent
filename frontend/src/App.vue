@@ -24,6 +24,9 @@
       :emotion="currentEmotion"
       :relationship="relationshipData"
       :voiceLanguage="settings.voiceLanguage"
+      :ttsEnabled="settings.ttsEnabled"
+      :ttsLanguage="settings.ttsLanguage"
+      :ttsVoice="settings.ttsVoice"
       @send="sendMessage"
       @loadMore="loadMoreHistory"
       @viewInfo="openActiveCharacterInfo"
@@ -88,7 +91,10 @@ const settings = ref({
   embeddingApiKey: '',
   embeddingModelName: 'text-embedding-3-small',
   randomEventEnabled: true,
-  voiceLanguage: 'zh-CN'
+  voiceLanguage: 'zh-CN',
+  ttsEnabled: true,
+  ttsLanguage: 'zh-CN',
+  ttsVoice: ''
 })
 
 // 随机事件轮询
@@ -101,7 +107,7 @@ onMounted(async () => {
     const res = await getSettings()
     const saved = res.data || {}
     if (Object.keys(saved).length > 0) {
-      Object.assign(settings.value, saved)
+      Object.assign(settings.value, normalizeSettings(saved))
     }
   } catch {}
   // 加载角色列表
@@ -113,11 +119,19 @@ onMounted(async () => {
   startEventPolling()
 })
 
+// 布尔配置以字符串形式存库，读写时统一转换
+function normalizeSettings(val) {
+  return {
+    ...val,
+    ttsEnabled: val.ttsEnabled !== false && val.ttsEnabled !== 'false'
+  }
+}
+
 function onSettingsSave(val) {
   // 合并而非整体替换，避免丢失表单之外的配置（如 randomEventEnabled）
-  settings.value = { ...settings.value, ...val }
+  settings.value = normalizeSettings({ ...settings.value, ...val })
   // 保存到数据库
-  saveSettings(val).catch(() => {
+  saveSettings({ ...val, ttsEnabled: String(val.ttsEnabled) }).catch(() => {
     ElMessage.warning('设置保存失败')
   })
 }

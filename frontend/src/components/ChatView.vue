@@ -49,6 +49,18 @@
               <div class="msg-meta">
                 <span class="msg-name">{{ character.name }}</span>
                 <span class="msg-time">{{ formatTime(msg.time) }}</span>
+                <button
+                  v-if="msg.content"
+                  class="speak-btn"
+                  :class="{ speaking: speakingIndex === i }"
+                  :title="speakingIndex === i ? '停止朗读' : '朗读'"
+                  @click="toggleSpeak(msg.content, i)"
+                >
+                  <el-icon :size="12">
+                    <VideoPause v-if="speakingIndex === i" />
+                    <Headset v-else />
+                  </el-icon>
+                </button>
               </div>
               <div class="bubble assistant-bubble">
                 {{ msg.content }}<span v-if="loading && i === messages.length - 1" class="typing-cursor"></span>
@@ -140,7 +152,10 @@ const props = defineProps({
   hasMoreHistory: { type: Boolean, default: false },
   emotion: { type: String, default: '' },
   relationship: { type: Object, default: null },
-  voiceLanguage: { type: String, default: 'zh-CN' }
+  voiceLanguage: { type: String, default: 'zh-CN' },
+  ttsEnabled: { type: Boolean, default: true },
+  ttsLanguage: { type: String, default: 'zh-CN' },
+  ttsVoice: { type: String, default: '' }
 })
 const emit = defineEmits(['send', 'loadMore', 'viewInfo'])
 
@@ -255,12 +270,86 @@ function toggleVoice() {
 
 onBeforeUnmount(() => {
   destroyRecognition()
+  stopSpeaking()
+})
+
+// 语音输出
+const synth = window.speechSynthesis
+const speakingIndex = ref(-1)
+let currentUtterance = null
+
+function stopSpeaking() {
+  currentUtterance = null
+  speakingIndex.value = -1
+  if (synth) synth.cancel()
+}
+
+function speak(text, index) {
+  if (!synth) {
+    ElMessage.warning('当前浏览器不支持语音朗读，请使用 Chrome 或 Edge')
+    return
+  }
+
+  stopSpeaking()
+
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = props.ttsLanguage || 'zh-CN'
+  utterance.rate = 1
+
+  // 指定音色；若系统已无该语音包则回退到按语言自动选择
+  if (props.ttsVoice) {
+    const picked = (synth.getVoices() || []).find(v => v.name === props.ttsVoice)
+    if (picked) utterance.voice = picked
+  }
+
+  utterance.onend = () => {
+    if (currentUtterance === utterance) stopSpeaking()
+  }
+  utterance.onerror = () => {
+    if (currentUtterance === utterance) stopSpeaking()
+  }
+
+  currentUtterance = utterance
+  speakingIndex.value = index
+
+  // Chrome 在 cancel() 之后立即 speak() 可能丢弃新的朗读，稍作延迟
+  setTimeout(() => {
+    if (currentUtterance === utterance) synth.speak(utterance)
+  }, 60)
+}
+
+function toggleSpeak(text, index) {
+  if (speakingIndex.value === index) {
+    stopSpeaking()
+    return
+  }
+  speak(text, index)
+}
+
+// 回复生成完毕后自动朗读
+watch(() => props.loading, (val, oldVal) => {
+  if (val || !oldVal) return
+  if (!props.ttsEnabled) return
+
+  const last = props.messages[props.messages.length - 1]
+  if (!last || last.role !== 'assistant') return
+
+  const text = (last.content || '').trim()
+  if (!text || text.startsWith('[')) return
+
+  speak(text, props.messages.length - 1)
+})
+
+// 切换角色时停止朗读
+watch(() => props.character?.id, () => {
+  stopSpeaking()
 })
 
 function send() {
   const text = input.value.trim()
   if (!text || props.loading) return
   if (recognizing.value) stopVoice()
+  stopSpeaking()
   emit('send', text)
   input.value = ''
 }
@@ -483,6 +572,34 @@ watch(() => props.messages.length, () => {
 
 .user-meta {
   flex-direction: row-reverse;
+}
+
+.speak-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-hint);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.speak-btn:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+}
+.speak-btn.speaking {
+  color: var(--accent);
+  animation: speak-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes speak-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .msg-name {

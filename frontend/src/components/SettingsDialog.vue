@@ -70,6 +70,45 @@
         </el-select>
         <div class="field-hint">使用麦克风语音输入时识别的语言</div>
       </el-form-item>
+
+      <el-divider content-position="left">语音输出</el-divider>
+
+      <el-form-item label="自动朗读回复">
+        <el-switch v-model="form.ttsEnabled" />
+        <div class="field-hint">开启后角色每次回复完会自动朗读，也可点击消息旁的按钮手动朗读</div>
+      </el-form-item>
+
+      <el-form-item label="语音输出语言">
+        <el-select v-model="form.ttsLanguage" placeholder="选择朗读语言" style="width: 100%">
+          <el-option
+            v-for="opt in languageOptions"
+            :key="opt.value"
+            :label="opt.label"
+            :value="opt.value"
+          />
+        </el-select>
+        <div class="field-hint">朗读使用的语言，实际音色取决于系统已安装的语音包</div>
+      </el-form-item>
+
+      <el-form-item label="语音音色">
+        <el-select
+          v-model="form.ttsVoice"
+          filterable
+          clearable
+          placeholder="默认（按语言自动选择）"
+          style="width: 100%"
+        >
+          <el-option
+            v-for="v in voiceOptions"
+            :key="v.voiceURI"
+            :label="`${v.name} (${v.lang})`"
+            :value="v.name"
+          />
+        </el-select>
+        <div class="field-hint">
+          来自系统已安装的语音包，留空则按语音输出语言自动选择；列表为空时说明系统未安装可用语音
+        </div>
+      </el-form-item>
     </el-form>
 
     <template #footer>
@@ -80,7 +119,7 @@
 </template>
 
 <script setup>
-import { reactive, watch } from 'vue'
+import { reactive, ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const props = defineProps({
@@ -96,7 +135,10 @@ const defaults = {
   embeddingApiUrl: '',
   embeddingApiKey: '',
   embeddingModelName: 'BAAI/bge-m3',
-  voiceLanguage: 'zh-CN'
+  voiceLanguage: 'zh-CN',
+  ttsEnabled: true,
+  ttsLanguage: 'zh-CN',
+  ttsVoice: ''
 }
 
 const languageOptions = [
@@ -114,6 +156,36 @@ const languageOptions = [
 
 const form = reactive({ ...defaults })
 
+// 系统语音包（Chrome 首次调用可能返回空，需等 voiceschanged 事件）
+const synth = window.speechSynthesis
+const voices = ref([])
+
+function loadVoices() {
+  if (!synth) return
+  const list = synth.getVoices() || []
+  if (list.length) voices.value = list
+}
+
+// 与语音输出语言一致的音色排前面，其余按语言和名称排序
+const voiceOptions = computed(() => {
+  const prefix = (form.ttsLanguage || '').split('-')[0].toLowerCase()
+  return [...voices.value].sort((a, b) => {
+    const aMatch = prefix && a.lang.toLowerCase().startsWith(prefix) ? 0 : 1
+    const bMatch = prefix && b.lang.toLowerCase().startsWith(prefix) ? 0 : 1
+    if (aMatch !== bMatch) return aMatch - bMatch
+    return `${a.lang}${a.name}`.localeCompare(`${b.lang}${b.name}`)
+  })
+})
+
+onMounted(() => {
+  loadVoices()
+  if (synth) synth.addEventListener('voiceschanged', loadVoices)
+})
+
+onBeforeUnmount(() => {
+  if (synth) synth.removeEventListener('voiceschanged', loadVoices)
+})
+
 watch(() => props.modelValue, (val) => {
   if (val) {
     form.apiUrl = props.settings.apiUrl || defaults.apiUrl
@@ -123,6 +195,10 @@ watch(() => props.modelValue, (val) => {
     form.embeddingApiKey = props.settings.embeddingApiKey || defaults.embeddingApiKey
     form.embeddingModelName = props.settings.embeddingModelName || defaults.embeddingModelName
     form.voiceLanguage = props.settings.voiceLanguage || defaults.voiceLanguage
+    form.ttsEnabled = props.settings.ttsEnabled ?? defaults.ttsEnabled
+    form.ttsLanguage = props.settings.ttsLanguage || defaults.ttsLanguage
+    form.ttsVoice = props.settings.ttsVoice || defaults.ttsVoice
+    loadVoices()
   }
 })
 
