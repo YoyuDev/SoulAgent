@@ -2,6 +2,14 @@
   <div class="chat-view">
     <!-- 未选择人物 -->
     <div v-if="!character" class="welcome">
+      <button
+        v-if="showMenuButton"
+        class="menu-btn welcome-menu-btn"
+        title="角色列表"
+        @click="$emit('toggleMenu')"
+      >
+        <el-icon :size="20"><Menu /></el-icon>
+      </button>
       <div class="welcome-logo">
         <img src="/logo.png" alt="SoulAgent" class="welcome-icon" />
         <h2>SoulAgent</h2>
@@ -12,19 +20,29 @@
     <!-- 聊天区 -->
     <template v-else>
       <div class="chat-header">
+        <button
+          v-if="showMenuButton"
+          class="menu-btn"
+          title="角色列表"
+          @click="$emit('toggleMenu')"
+        >
+          <el-icon :size="20"><Menu /></el-icon>
+        </button>
         <div class="header-profile" title="查看角色资料" @click="$emit('viewInfo')">
           <el-avatar :size="30" :src="character.avatar || undefined">
             {{ character.name?.[0] }}
           </el-avatar>
           <span>{{ character.name }}</span>
         </div>
-        <span v-if="emotion" class="emotion-badge">
-          <span class="emotion-dot"></span>
-          {{ emotion }}
-        </span>
-        <span v-if="relationship && relationship.stageDesc" class="relationship-badge" :class="{ 'stage-new': relationship.stage === 'stranger' }">
-          {{ relationship.stageDesc }}
-        </span>
+        <div v-if="emotion || relationship?.stageDesc" class="header-badges">
+          <span v-if="emotion" class="emotion-badge">
+            <span class="emotion-dot"></span>
+            <span class="badge-text">{{ emotion }}</span>
+          </span>
+          <span v-if="relationship?.stageDesc" class="relationship-badge" :class="{ 'stage-new': relationship.stage === 'stranger' }">
+            <span class="badge-text">{{ relationship.stageDesc }}</span>
+          </span>
+        </div>
       </div>
 
       <div class="messages" ref="msgContainer" @scroll="onScroll">
@@ -155,9 +173,10 @@ const props = defineProps({
   voiceLanguage: { type: String, default: 'zh-CN' },
   ttsEnabled: { type: Boolean, default: true },
   ttsLanguage: { type: String, default: 'zh-CN' },
-  ttsVoice: { type: String, default: '' }
+  ttsVoice: { type: String, default: '' },
+  showMenuButton: { type: Boolean, default: false }
 })
-const emit = defineEmits(['send', 'loadMore', 'viewInfo'])
+const emit = defineEmits(['send', 'loadMore', 'viewInfo', 'toggleMenu'])
 
 const input = ref('')
 const msgContainer = ref(null)
@@ -443,6 +462,8 @@ watch(() => props.messages.length, () => {
   flex-shrink: 0;
   color: var(--text-primary);
   transition: border-color 0.3s;
+  /* 兜底：内容再长也不许把页面撑宽（移动端会被浏览器整体缩放，出现右侧空白） */
+  overflow: hidden;
 }
 
 .header-profile {
@@ -455,7 +476,51 @@ watch(() => props.messages.length, () => {
   cursor: pointer;
   transition: background 0.15s;
 }
+
+/* 移动端汉堡按钮（仅手机档显示） */
+.menu-btn {
+  width: 34px;
+  height: 34px;
+  margin-left: -6px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.menu-btn:hover { background: var(--bg-hover); color: var(--accent); }
 .header-profile:hover { background: var(--bg-hover); }
+
+/* 欢迎页左上角的角色列表入口（移动端） */
+.welcome { position: relative; }
+.welcome-menu-btn {
+  position: absolute;
+  top: 4px;
+  left: 10px;
+}
+
+/* 情绪 / 关系徽章容器 */
+.header-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 4px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+/* 徽章文案：过长时省略，避免撑宽顶栏 */
+.badge-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
 
 .emotion-badge {
   display: inline-flex;
@@ -467,7 +532,7 @@ watch(() => props.messages.length, () => {
   background: rgba(16, 163, 127, 0.1);
   padding: 3px 10px;
   border-radius: 12px;
-  margin-left: 4px;
+  min-width: 0;
 }
 
 .emotion-dot {
@@ -493,7 +558,7 @@ watch(() => props.messages.length, () => {
   background: rgba(168, 85, 247, 0.1);
   padding: 3px 10px;
   border-radius: 12px;
-  margin-left: 4px;
+  min-width: 0;
 }
 
 .stage-new {
@@ -771,5 +836,94 @@ watch(() => props.messages.length, () => {
 @keyframes voice-wave {
   0%, 100% { transform: scaleY(0.25); opacity: 0.5; }
   50% { transform: scaleY(1); opacity: 1; }
+}
+
+/* ===== 响应式：手机档（< 768px） ===== */
+@media (max-width: 767px) {
+  .chat-header {
+    height: auto;
+    min-height: 48px;
+    padding: 4px 10px;
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .header-profile {
+    min-width: 0;
+    margin-left: -4px;
+    padding: 4px;
+    gap: 8px;
+  }
+  .header-profile span {
+    max-width: 45vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 徽章换到第二行，左边缘与头像对齐，避免撑宽页面 */
+  .header-badges {
+    flex-basis: 100%;
+    margin-left: 0;
+    padding-left: 48px;
+    gap: 6px;
+    flex-wrap: nowrap;
+  }
+
+  .emotion-badge,
+  .relationship-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+  }
+
+  /* 情绪文案可省略，关系阶段完整保留 */
+  .emotion-badge { flex: 1 1 auto; }
+  .relationship-badge { flex: 0 0 auto; }
+
+  /* 消息区：减小左右留白，放宽气泡 */
+  .message-row {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .msg-body {
+    max-width: 82%;
+  }
+
+  /* 输入区：去掉 PC 端 20% 的大留白 */
+  .input-area {
+    padding: 10px 12px 12px;
+  }
+  .input-box {
+    padding: 6px 6px 6px 12px;
+  }
+
+  /* 触控热区放大到 ≥44px */
+  .mic-btn,
+  .send-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+  }
+  .menu-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* 朗读按钮：视觉尺寸基本不变，用伪元素把热区撑到 44px */
+  .speak-btn {
+    position: relative;
+    width: 26px;
+    height: 26px;
+  }
+  .speak-btn::after {
+    content: '';
+    position: absolute;
+    inset: -9px;
+  }
+
+  .welcome {
+    padding: 24px;
+    text-align: center;
+  }
 }
 </style>

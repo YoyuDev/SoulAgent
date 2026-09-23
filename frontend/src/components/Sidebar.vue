@@ -1,5 +1,5 @@
 <template>
-  <div class="sidebar" :class="{ collapsed }">
+  <div class="sidebar" :class="{ collapsed: collapsed && !inDrawer, 'in-drawer': inDrawer }">
     <div class="sidebar-header">
       <div class="logo" v-if="!collapsed">
         <img src="/logo.png" alt="SoulAgent" class="logo-img" />
@@ -67,8 +67,8 @@
       </div>
     </div>
 
-    <!-- 折叠按钮 -->
-    <div class="collapse-btn" @click="$emit('toggleCollapse')">
+    <!-- 折叠按钮（抽屉内不需要） -->
+    <div v-if="!inDrawer" class="collapse-btn" @click="$emit('toggleCollapse')">
       <el-icon :size="16">
         <DArrowLeft v-if="!collapsed" />
         <DArrowRight v-else />
@@ -82,7 +82,8 @@ defineProps({
   characters: { type: Array, default: () => [] },
   activeId: { type: Number, default: null },
   theme: { type: String, default: 'dark' },
-  collapsed: { type: Boolean, default: false }
+  collapsed: { type: Boolean, default: false },
+  inDrawer: { type: Boolean, default: false }
 })
 import { ElMessageBox } from 'element-plus'
 
@@ -132,6 +133,13 @@ async function handleCommand(cmd, character) {
 
 .sidebar.collapsed {
   width: 60px;
+}
+
+/* 抽屉内始终占满宽度与高度 */
+.sidebar.in-drawer {
+  width: 100%;
+  height: 100%;
+  border-right: none;
 }
 .sidebar.collapsed .char-item {
   justify-content: center;
@@ -321,5 +329,34 @@ async function handleCommand(cmd, character) {
 .collapsed .sidebar-footer .char-item {
   justify-content: center;
   padding: 10px 0;
+}
+
+/* ===== 触屏设备没有 hover，「更多」按钮需常驻显示 ===== */
+@media (hover: none) {
+  .more-btn { opacity: 1; }
+}
+
+/* ===== 响应式：手机档（< 768px） ===== */
+@media (max-width: 767px) {
+  .char-list { padding: 6px 8px; }
+
+  .char-item {
+    padding: 12px;
+    gap: 12px;
+    border-radius: 10px;
+  }
+
+  /* 视觉尺寸不变，用伪元素把「更多」热区撑到 44px */
+  .more-btn {
+    position: relative;
+    padding: 6px;
+  }
+  .more-btn::after {
+    content: '';
+    position: absolute;
+    inset: -9px;
+  }
+
+  .empty { padding: 40px 20px; }
 }
 </style>

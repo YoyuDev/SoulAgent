@@ -1,21 +1,20 @@
 <template>
   <div class="app">
-    <Sidebar
-      :characters="characters"
-      :activeId="activeId"
-      :theme="theme"
-      :collapsed="sidebarCollapsed"
-      @select="selectCharacter"
-      @create="showCreateDialog = true"
-      @delete="deleteCharacter"
-      @clear-history="clearHistory"
-      @settings="showSettingsDialog = true"
-      @toggleTheme="toggleTheme"
-      @toggleCollapse="sidebarCollapsed = !sidebarCollapsed"
-      @update-random-event="handleUpdateRandomEvent"
-      @viewInfo="openCharacterInfo"
-      @viewEvents="openCharacterEvents"
-    />
+    <!-- 手机端：抽屉式侧边栏 -->
+    <el-drawer
+      v-if="isMobile"
+      v-model="mobileDrawerOpen"
+      direction="ltr"
+      size="260px"
+      :with-header="false"
+      class="sidebar-drawer"
+    >
+      <Sidebar v-bind="sidebarCommonProps" :collapsed="false" :in-drawer="true" v-on="sidebarHandlers" />
+    </el-drawer>
+
+    <!-- PC / 平板：内联侧边栏 -->
+    <Sidebar v-else v-bind="sidebarCommonProps" :collapsed="sidebarCollapsed" v-on="sidebarHandlers" />
+
     <ChatView
       :character="activeCharacter"
       :messages="messages"
@@ -27,9 +26,11 @@
       :ttsEnabled="settings.ttsEnabled"
       :ttsLanguage="settings.ttsLanguage"
       :ttsVoice="settings.ttsVoice"
+      :showMenuButton="isMobile"
       @send="sendMessage"
       @loadMore="loadMoreHistory"
       @viewInfo="openActiveCharacterInfo"
+      @toggleMenu="mobileDrawerOpen = true"
     />
     <CreateCharacterDialog
       v-model="showCreateDialog"
@@ -59,6 +60,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElNotification } from 'element-plus'
 import { chat, getCharacters, deleteCharacter as deleteCharacterApi, clearChatHistory, getChatHistory, getSettings, saveSettings, getEmotion, getRelationship, getUnsharedEvents, markEventAsShared, updateRandomEventEnabled } from './api/index.js'
 import { useTheme } from './composables/useTheme.js'
+import { useBreakpoint } from './composables/useBreakpoint.js'
 import Sidebar from './components/Sidebar.vue'
 import ChatView from './components/ChatView.vue'
 import CreateCharacterDialog from './components/CreateCharacterDialog.vue'
@@ -67,6 +69,7 @@ import CharacterInfoDialog from './components/CharacterInfoDialog.vue'
 import EventHistoryDialog from './components/EventHistoryDialog.vue'
 
 const { theme, toggle: toggleTheme } = useTheme()
+const { isMobile, isTablet } = useBreakpoint()
 
 const characters = ref([])
 const activeId = ref(null)
@@ -82,6 +85,35 @@ const showEventsDialog = ref(false)
 const eventsCharacter = ref(null)
 const currentEmotion = ref('')
 const relationshipData = ref(null)
+const mobileDrawerOpen = ref(false)
+
+// 平板档自动折叠侧边栏，PC 档恢复展开
+watch(isTablet, (val) => {
+  sidebarCollapsed.value = val
+}, { immediate: true })
+
+// 侧边栏在两处复用（PC 内联 / 手机抽屉），统一 props 与事件，避免重复绑定
+const sidebarCommonProps = computed(() => ({
+  characters: characters.value,
+  activeId: activeId.value,
+  theme: theme.value
+}))
+
+const sidebarHandlers = {
+  select: (id) => {
+    selectCharacter(id)
+    mobileDrawerOpen.value = false
+  },
+  create: () => { showCreateDialog.value = true },
+  delete: deleteCharacter,
+  clearHistory,
+  settings: () => { showSettingsDialog.value = true },
+  toggleTheme,
+  toggleCollapse: () => { sidebarCollapsed.value = !sidebarCollapsed.value },
+  updateRandomEvent: handleUpdateRandomEvent,
+  viewInfo: openCharacterInfo,
+  viewEvents: openCharacterEvents
+}
 
 const settings = ref({
   apiUrl: 'https://api.openai.com/v1',
@@ -346,6 +378,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .app {
   display: flex;
   height: 100vh;
+  /* 移动端浏览器地址栏会吃掉 vh，dvh 更准确 */
+  height: 100dvh;
   background: var(--bg-primary);
   color: var(--text-primary);
   transition: background 0.3s, color 0.3s;
